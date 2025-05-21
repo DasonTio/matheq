@@ -17,6 +17,7 @@
     "@mantine/modals": "^8.0.1",
     "@phosphor-icons/react": "^2.1.8",
     "@tailwindcss/vite": "^4.1.7",
+    "mathjs": "^14.4.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-latex": "^2.0.0",
