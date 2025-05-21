@@ -11,7 +11,7 @@ import Layout from "./components/Layout";
 
 const router = createBrowserRouter(
   createRoutesFromElements(
-    <Route path="/" element={<Layout />}>
+    <Route path="/">
       <Route index element={<HomePage />} />
       <Route path="/iteration" element={<IterationPage />} />
       <Route path="/login" element={<LoginPage />} />
