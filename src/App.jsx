@@ -5,13 +5,13 @@ import {
   RouterProvider,
 } from "react-router-dom";
 import HomePage from "./pages/Home";
-import LoginPage from "./pages/login";
+import NewtonRaphsonPage from "./pages/newton-raphson";
 
 const router = createBrowserRouter(
   createRoutesFromElements(
     <Route path="/">
       <Route index element={<HomePage />} />
-      <Route path="/login" element={<LoginPage />} />
+      <Route path="newton-raphson" element={<NewtonRaphsonPage />} />
     </Route>
   )
 );
