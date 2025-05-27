@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import {
   TextInput,
   NumberInput,
@@ -9,9 +9,20 @@ import {
   Table,
   Text,
 } from "@mantine/core";
-import { LineChart } from "@mantine/charts";
 import Latex from "react-latex";
 import * as math from "mathjs";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  ReferenceLine,
+  ReferenceDot,
+  Tooltip,
+  Legend,
+} from "recharts";
 
 export default function NewtonRaphsonPage() {
   const [funcString, setFuncString] = useState("x^4 + x^3 - 4x - 5");
@@ -21,19 +32,20 @@ export default function NewtonRaphsonPage() {
 
   const [iterations, setIterations] = useState([]);
   const [chartData, setChartData] = useState([]);
-  const [chartSeries, setChartSeries] = useState([]);
   const [dfLatex, setDfLatex] = useState("");
   const [error, setError] = useState("");
 
   const handleSubmit = () => {
     setError("");
     try {
+      // Parse dan kompilasi f dan f'
       const fNode = math.parse(funcString);
       const f = fNode.compile();
       const dfNode = math.derivative(fNode, "x");
       const df = dfNode.compile();
       setDfLatex(dfNode.toTex());
 
+      // Newton–Raphson iterasi
       let xi = x0;
       const iters = [];
       for (let i = 0; i < maxIter; i++) {
@@ -49,53 +61,31 @@ export default function NewtonRaphsonPage() {
       }
       setIterations(iters);
 
-      const delta = 1;
-      const tangents = iters.map(({ xi, fxi, dfxi }) => ({
-        x0: xi,
-        y0: fxi,
-        m: dfxi,
-      }));
-
-      const xs = iters.map((r) => r.xi);
-      const xMin = Math.min(...xs) - 2;
-      const xMax = Math.max(...xs) + 2;
+      // Siapkan data untuk plot f(x) dan segmen-segmen tangen
+      const delta = 1; // panjang segmen tangen ke kiri/kanan
+      const xsIter = iters.map((r) => r.xi);
+      const xMin = Math.min(...xsIter) - delta * 1.5;
+      const xMax = Math.max(...xsIter) + delta * 1.5;
       const samples = 200;
       const step = (xMax - xMin) / samples;
-      const xPlot = Array.from(
-        { length: samples + 1 },
-        (_, idx) => xMin + idx * step
-      );
 
-      let allX = [
-        ...xPlot,
-        ...tangents.flatMap((t) => [t.x0 - delta, t.x0 + delta]),
-      ];
-      allX = Array.from(new Set(allX)).sort((a, b) => a - b);
-
-      const data = allX.map((x) => {
-        const row = { x };
-        row["f(x)"] = f.evaluate({ x });
-        tangents.forEach((t, idx) => {
-          const key = `tangent ${idx}`;
-          if (x >= t.x0 - delta && x <= t.x0 + delta) {
-            row[key] = t.m * (x - t.x0) + t.y0;
+      const data = [];
+      for (let j = 0; j <= samples; j++) {
+        const x = xMin + j * step;
+        const point = { x, fx: f.evaluate({ x }) };
+        // untuk setiap iterasi, hitung nilai tangen di [xi - delta, xi + delta]
+        iters.forEach(({ xi, fxi, dfxi }, idx) => {
+          const key = `tan${idx}`;
+          if (x >= xi - delta && x <= xi + delta) {
+            point[key] = dfxi * (x - xi) + fxi;
           } else {
-            row[key] = null;
+            point[key] = null;
           }
         });
-        return row;
-      });
-
-      const series = [
-        { name: "f(x)", color: "red.6" },
-        ...tangents.map((_, idx) => ({
-          name: `tangent ${idx}`,
-          color: "blue.6",
-        })),
-      ];
+        data.push(point);
+      }
 
       setChartData(data);
-      setChartSeries(series);
     } catch (err) {
       setError(err.message);
     }
@@ -106,7 +96,6 @@ export default function NewtonRaphsonPage() {
       <Title order={2} mb="md">
         Metode Newton–Raphson
       </Title>
-
       <div className="flex flex-col gap-4 max-w-lg">
         <TextInput
           label="Fungsi f(x)"
@@ -147,22 +136,100 @@ export default function NewtonRaphsonPage() {
           </Title>
 
           <div className="mb-4 flex flex-col space-y-2">
-            <Latex>{`$$
-        f(x) = ${funcString}
-      $$`}</Latex>
-            <Latex>{`$$
-        f'(x) = ${dfLatex}
-      $$`}</Latex>
+            <Latex>{`$$f(x) = ${funcString}$$`}</Latex>
+            <Latex>{`$$f'(x) = ${dfLatex}$$`}</Latex>
           </div>
 
-          <LineChart
-            h={400}
-            data={chartData}
-            dataKey="x"
-            series={chartSeries}
-            curveType="linear"
-            withDots={false}
-          />
+          <ResponsiveContainer width="100%" height={400}>
+            <LineChart
+              data={chartData}
+              margin={{ top: 20, right: 40, bottom: 20, left: 40 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis
+                dataKey="x"
+                type="number"
+                domain={["auto", "auto"]}
+                label={{ value: "x", position: "insideBottom", offset: -10 }}
+              />
+              <YAxis
+                domain={["auto", "auto"]}
+                label={{
+                  value: "f(x)",
+                  angle: -90,
+                  position: "insideLeft",
+                  offset: 0,
+                }}
+              />
+              <Tooltip
+                formatter={(value, name) => [
+                  typeof value === "number" ? value.toFixed(4) : value,
+                  name,
+                ]}
+              />
+              <Legend verticalAlign="top" />
+
+              {/* Garis f(x) */}
+              <Line
+                type="monotone"
+                dataKey="fx"
+                name="f(x)"
+                stroke="#ff4d4f"
+                dot={false}
+                strokeWidth={2}
+              />
+
+              {/* Segmen-segmen tangen */}
+              {iterations.map(({ i }, idx) => (
+                <Line
+                  key={i}
+                  type="linear"
+                  dataKey={`tan${i}`}
+                  name={`Tangen ke-${i}`}
+                  stroke="#228be6"
+                  dot={false}
+                  strokeWidth={1.5}
+                />
+              ))}
+
+              {/* Garis referensi vertikal di tiap xi */}
+              {iterations.map(({ i, xi }) => (
+                <ReferenceLine
+                  key={`xref-${i}`}
+                  x={xi}
+                  stroke="#999"
+                  strokeDasharray="3 3"
+                  label={{ position: "bottom", value: `x${i}` }}
+                />
+              ))}
+
+              {/* Garis referensi horizontal di tiap f(xi) */}
+              {iterations.map(({ i, fxi }) => (
+                <ReferenceLine
+                  key={`yref-${i}`}
+                  y={fxi}
+                  stroke="#999"
+                  strokeDasharray="3 3"
+                  label={{ position: "right", value: `f(x${i})` }}
+                />
+              ))}
+
+              {/* Titik iterasi */}
+              {iterations.map(({ i, xi, fxi }) => (
+                <ReferenceDot
+                  key={`dot-${i}`}
+                  x={xi}
+                  y={fxi}
+                  r={4}
+                  fill="#228be6"
+                  label={{
+                    position: "top",
+                    value: `(${xi.toFixed(2)}, ${fxi.toFixed(2)})`,
+                  }}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
 
           <Table
             mt="6"
