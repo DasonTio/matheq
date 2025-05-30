@@ -3,7 +3,6 @@ import {
   Container,
   Paper,
   Title,
-  TextInput,
   NumberInput,
   Button,
   Group,
@@ -17,10 +16,12 @@ import {
   Portal,
   ThemeIcon,
   Badge,
+  SimpleGrid,
+  ActionIcon,
+  Textarea,
 } from "@mantine/core";
 import {
   LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -28,16 +29,90 @@ import {
   ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
-import { Info, ArrowRight, ArrowLeft } from "@phosphor-icons/react";
+import { Info, ArrowRight, ArrowLeft, Backspace } from "@phosphor-icons/react";
+import Latex from "react-latex";
 
-// Parse math expression like "-0.9x^2 + 1.7x + 2.5"
+// Mathematical keyboard layout
+const mathKeyboard = [
+  [
+    { label: "x", latex: "x", value: "x" },
+    { label: "y", latex: "y", value: "y" },
+    { label: "z", latex: "z", value: "z" },
+    { label: "π", latex: "\\pi", value: "Math.PI" },
+    { label: "e", latex: "e", value: "Math.E" },
+  ],
+  [
+    { label: "ln", latex: "\\ln", value: "Math.log", needsParens: true },
+    { label: "log", latex: "\\log", value: "Math.log10", needsParens: true },
+    { label: "sin", latex: "\\sin", value: "Math.sin", needsParens: true },
+    { label: "cos", latex: "\\cos", value: "Math.cos", needsParens: true },
+    { label: "tan", latex: "\\tan", value: "Math.tan", needsParens: true },
+  ],
+  [
+    { label: "√", latex: "\\sqrt{}", value: "Math.sqrt", needsParens: true },
+    { label: "x²", latex: "x^2", value: "^2" },
+    { label: "xⁿ", latex: "x^n", value: "^" },
+    { label: "¹⁄ₓ", latex: "\\frac{1}{x}", value: "1/" },
+    { label: "()", latex: "()", value: "()" },
+  ],
+  [
+    { label: "7", latex: "7", value: "7" },
+    { label: "8", latex: "8", value: "8" },
+    { label: "9", latex: "9", value: "9" },
+    { label: "÷", latex: "\\div", value: "/" },
+    { label: "+", latex: "+", value: "+" },
+  ],
+  [
+    { label: "4", latex: "4", value: "4" },
+    { label: "5", latex: "5", value: "5" },
+    { label: "6", latex: "6", value: "6" },
+    { label: "×", latex: "\\times", value: "*" },
+    { label: "−", latex: "-", value: "-" },
+  ],
+  [
+    { label: "1", latex: "1", value: "1" },
+    { label: "2", latex: "2", value: "2" },
+    { label: "3", latex: "3", value: "3" },
+    { label: ".", latex: ".", value: "." },
+    { label: "0", latex: "0", value: "0" },
+  ],
+];
+
+// Parse math expression for evaluation
 function parseMathExpr(expr) {
   return expr
+    .replace(/Math\.PI/g, Math.PI)
+    .replace(/Math\.E/g, Math.E)
     .replace(/(\d*\.?\d*)x\^(\d+)/g, (m, coef, pow) =>
       `${coef === "" ? 1 : coef}*Math.pow(x,${pow})`
     )
-    .replace(/([0-9])x/g, "$1*x")
-    .replace(/\bx\b/g, "x");
+    .replace(/(\d*\.?\d*)x/g, (m, coef) => 
+      `${coef === "" ? 1 : coef}*x`
+    )
+    .replace(/x\^/g, "Math.pow(x,")
+    .replace(/\^(\d+)/g, (m, pow) => `,${pow})`)
+    .replace(/Math\.log\(/g, "Math.log(")
+    .replace(/Math\.log10\(/g, "Math.log10(")
+    .replace(/Math\.sin\(/g, "Math.sin(")
+    .replace(/Math\.cos\(/g, "Math.cos(")
+    .replace(/Math\.tan\(/g, "Math.tan(")
+    .replace(/Math\.sqrt\(/g, "Math.sqrt(");
+}
+
+// Convert expression to LaTeX
+function toLatex(expr) {
+  return expr
+    .replace(/Math\.PI/g, "\\pi")
+    .replace(/Math\.E/g, "e")
+    .replace(/Math\.log\(/g, "\\ln(")
+    .replace(/Math\.log10\(/g, "\\log(")
+    .replace(/Math\.sin\(/g, "\\sin(")
+    .replace(/Math\.cos\(/g, "\\cos(")
+    .replace(/Math\.tan\(/g, "\\tan(")
+    .replace(/Math\.sqrt\(/g, "\\sqrt{")
+    .replace(/Math\.pow\(([^,]+),([^)]+)\)/g, "$1^{$2}")
+    .replace(/\*/g, "\\cdot")
+    .replace(/\//g, "\\div");
 }
 
 function safeEval(expr, x) {
@@ -97,6 +172,7 @@ const defaultExpr = "-0.9*x^2 + 1.7*x + 2.5";
 
 export default function MetodeTertutup() {
   const [expr, setExpr] = useState(defaultExpr);
+  const [displayExpr, setDisplayExpr] = useState(defaultExpr);
   const [a, setA] = useState(2.8);
   const [b, setB] = useState(3.0);
   const [tol, setTol] = useState(1e-6);
@@ -105,14 +181,58 @@ export default function MetodeTertutup() {
   const [currentIteration, setCurrentIteration] = useState(0);
   const [currentSubStep, setCurrentSubStep] = useState(0);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [showKeyboard, setShowKeyboard] = useState(false);
+  const [cursorPosition, setCursorPosition] = useState(0);
 
   // Refs for targeting elements
   const functionInputRef = useRef(null);
   const parametersRef = useRef(null);
   const iterationRef = useRef(null);
   const chartRef = useRef(null);
+  const textareaRef = useRef(null);
 
   const parsedExpr = parseMathExpr(expr);
+
+  const handleKeyboardInput = (key) => {
+    const { value, needsParens } = key;
+    const before = expr.substring(0, cursorPosition);
+    const after = expr.substring(cursorPosition);
+    
+    let newExpr;
+    let newCursorPos;
+
+    if (needsParens) {
+      newExpr = before + value + "(" + after;
+      newCursorPos = cursorPosition + value.length + 1;
+    } else if (value === "()") {
+      newExpr = before + "()" + after;
+      newCursorPos = cursorPosition + 1;
+    } else {
+      newExpr = before + value + after;
+      newCursorPos = cursorPosition + value.length;
+    }
+
+    setExpr(newExpr);
+    setDisplayExpr(newExpr);
+    setCursorPosition(newCursorPos);
+  };
+
+  const handleBackspace = () => {
+    if (cursorPosition > 0) {
+      const before = expr.substring(0, cursorPosition - 1);
+      const after = expr.substring(cursorPosition);
+      const newExpr = before + after;
+      setExpr(newExpr);
+      setDisplayExpr(newExpr);
+      setCursorPosition(cursorPosition - 1);
+    }
+  };
+
+  const handleClear = () => {
+    setExpr("");
+    setDisplayExpr("");
+    setCursorPosition(0);
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -127,6 +247,7 @@ export default function MetodeTertutup() {
     setShowTutorial(true);
     setCurrentIteration(0);
     setCurrentSubStep(0);
+    setShowKeyboard(false);
   };
 
   const currentStep = steps[currentIteration] || {};
@@ -205,8 +326,11 @@ export default function MetodeTertutup() {
     }
   };
 
+  // Find the root (final result)
+  const finalRoot = steps.length > 0 ? steps[steps.length - 1].c : null;
+
   return (
-    <Container size="lg" py="xl">
+    <Container size="xl" py="xl">
       <Paper shadow="md" radius="lg" p="xl" withBorder>
         <Title align="center" order={2} mb="md">
           Metode Biseksi (Bisection Method)
@@ -215,13 +339,75 @@ export default function MetodeTertutup() {
         <form onSubmit={handleSubmit}>
           <Stack spacing="md">
             <div ref={functionInputRef}>
-              <TextInput
-                label="Fungsi f(x)"
-                description="Contoh: -0.9*x^2 + 1.7*x + 2.5"
+              <Text size="sm" weight={500} mb={4}>
+                Fungsi f(x)
+              </Text>
+              
+              {/* LaTeX Display */}
+              <Paper p="md" withBorder mb="sm" style={{ minHeight: 60, display: "flex", alignItems: "center" }}>
+                <Text size="lg">
+                  <Latex>{`$f(x) = ${toLatex(displayExpr)}$`}</Latex>
+                </Text>
+              </Paper>
+
+              {/* Input Field */}
+              <Textarea
+                ref={textareaRef}
+                placeholder="Masukkan fungsi matematika..."
                 value={expr}
-                onChange={(e) => setExpr(e.target.value)}
+                onChange={(e) => {
+                  setExpr(e.target.value);
+                  setDisplayExpr(e.target.value);
+                  setCursorPosition(e.target.selectionStart);
+                }}
+                onClick={(e) => setCursorPosition(e.target.selectionStart)}
+                onKeyUp={(e) => setCursorPosition(e.target.selectionStart)}
+                minRows={2}
                 required
               />
+
+              <Group position="apart" mt="sm">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowKeyboard(!showKeyboard)}
+                >
+                  {showKeyboard ? "Sembunyikan" : "Tampilkan"} Keyboard Matematika
+                </Button>
+                <Group>
+                  <Button variant="subtle" onClick={handleClear}>
+                    Clear
+                  </Button>
+                  <ActionIcon onClick={handleBackspace} variant="subtle">
+                    <Backspace size={16} />
+                  </ActionIcon>
+                </Group>
+              </Group>
+
+              {/* Mathematical Keyboard */}
+              {showKeyboard && (
+                <Paper p="md" mt="md" withBorder>
+                  <Text size="sm" weight={500} mb="md">
+                    Keyboard Matematika
+                  </Text>
+                  <Stack spacing="xs">
+                    {mathKeyboard.map((row, rowIndex) => (
+                      <Group key={rowIndex} spacing="xs" position="center">
+                        {row.map((key, keyIndex) => (
+                          <Button
+                            key={keyIndex}
+                            variant="default"
+                            size="sm"
+                            onClick={() => handleKeyboardInput(key)}
+                            style={{ minWidth: 50, height: 40 }}
+                          >
+                            {key.label}
+                          </Button>
+                        ))}
+                      </Group>
+                    ))}
+                  </Stack>
+                </Paper>
+              )}
             </div>
 
             <div ref={parametersRef}>
@@ -258,11 +444,25 @@ export default function MetodeTertutup() {
               </Group>
             </div>
 
-            <Button type="submit" fullWidth>
+            <Button type="submit" fullWidth size="lg">
               Mulai Simulasi
             </Button>
           </Stack>
         </form>
+
+        {/* Display Root Result */}
+        {finalRoot !== null && (
+          <Paper p="md" mt="md" withBorder style={{ backgroundColor: "#e7f5ff" }}>
+            <Group position="center">
+              <Text size="lg" weight={600}>
+                Akar yang ditemukan: 
+              </Text>
+              <Text size="xl" weight={700} color="blue">
+                <Latex>{`$x \\approx ${finalRoot}$`}</Latex>
+              </Text>
+            </Group>
+          </Paper>
+        )}
 
         {steps.length > 0 && (
           <Grid mt="xl" gutter="xl" align="flex-start">
@@ -296,7 +496,7 @@ export default function MetodeTertutup() {
                       title="Langkah 1."
                       content={
                         <Text>
-                          f(a) = f({currentStep.a}) = {currentStep.fa}
+                          <Latex>{`$f(a) = f(${currentStep.a}) = ${currentStep.fa}$`}</Latex>
                         </Text>
                       }
                     />
@@ -306,7 +506,7 @@ export default function MetodeTertutup() {
                       title="Langkah 2."
                       content={
                         <Text>
-                          f(b) = f({currentStep.b}) = {currentStep.fb}
+                          <Latex>{`$f(b) = f(${currentStep.b}) = ${currentStep.fb}$`}</Latex>
                         </Text>
                       }
                     />
@@ -316,7 +516,7 @@ export default function MetodeTertutup() {
                       title="Langkah 3."
                       content={
                         <Text>
-                          c = (a + b) / 2 = ({currentStep.a} + {currentStep.b}) / 2 = {currentStep.c}
+                          <Latex>{`$c = \\frac{a + b}{2} = \\frac{${currentStep.a} + ${currentStep.b}}{2} = ${currentStep.c}$`}</Latex>
                         </Text>
                       }
                     />
@@ -327,7 +527,7 @@ export default function MetodeTertutup() {
                       content={
                         <Stack spacing={4}>
                           <Text>
-                            f(c) = f({currentStep.c}) = {currentStep.fc}
+                            <Latex>{`$f(c) = f(${currentStep.c}) = ${currentStep.fc}$`}</Latex>
                           </Text>
                           {currentSubStep >= 3 && (
                             <Text size="sm" color="blue" weight={500}>
@@ -408,7 +608,7 @@ export default function MetodeTertutup() {
                       <ReferenceLine 
                         x={currentStep.a} 
                         stroke="green" 
-                        strokeWidth={2}
+                        strokeWidth={3}
                         label={{ value: `a = ${currentStep.a}`, position: "topLeft" }}
                       />
                       
@@ -416,7 +616,7 @@ export default function MetodeTertutup() {
                       <ReferenceLine 
                         x={currentStep.b} 
                         stroke="orange" 
-                        strokeWidth={2}
+                        strokeWidth={3}
                         label={{ value: `b = ${currentStep.b}`, position: "topRight" }}
                       />
                       
@@ -425,19 +625,12 @@ export default function MetodeTertutup() {
                         <ReferenceLine 
                           x={currentStep.c} 
                           stroke="red" 
-                          strokeWidth={2}
+                          strokeWidth={3}
                           label={{ value: `c = ${currentStep.c}`, position: "top" }}
                         />
                       )}
                       
-                      <Line
-                        type="monotone"
-                        dataKey="y"
-                        stroke="#228be6"
-                        strokeWidth={2}
-                        dot={false}
-                        name="f(x)"
-                      />
+                      {/* No function line - only vertical reference lines */}
                     </LineChart>
                   </ResponsiveContainer>
                   <Text mt="md" size="sm" color="dimmed" align="center">
@@ -486,7 +679,7 @@ export default function MetodeTertutup() {
                   
                   <Title order={5}>{currentTutorial.title}</Title>
                   <Text size="sm">
-                    {currentTutorial.content}
+                    <Latex>{currentTutorial.content}</Latex>
                   </Text>
                   <Text size="xs" color="dimmed">
                     {currentTutorial.detail}
