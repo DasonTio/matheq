@@ -15,6 +15,7 @@ import {
   Badge,
   ActionIcon,
   Textarea,
+  Tabs,
 } from "@mantine/core";
 import {
   LineChart,
@@ -153,7 +154,8 @@ function generateChartData(expr, a, b, points = 100) {
   });
 }
 
-function bisectionSteps(expr, a, b, tol = 1e-6, maxSteps = 20) {
+// Updated function to handle both Bisection and Regula Falsi methods
+function rootFindingSteps(expr, a, b, tol = 1e-6, maxSteps = 20, method = "bisection") {
   const steps = [];
   let fa = safeEval(expr, a);
   let fb = safeEval(expr, b);
@@ -161,7 +163,15 @@ function bisectionSteps(expr, a, b, tol = 1e-6, maxSteps = 20) {
   if (isNaN(fa) || isNaN(fb) || fa * fb > 0) return [];
 
   for (let i = 0; i < maxSteps; i++) {
-    const c = (a + b) / 2;
+    let c;
+    
+    // The main difference between the two methods
+    if (method === "bisection") {
+      c = (a + b) / 2;
+    } else { // regula-falsi
+      c = (a * fb - b * fa) / (fb - fa);
+    }
+    
     const fc = safeEval(expr, c);
 
     steps.push({
@@ -174,6 +184,7 @@ function bisectionSteps(expr, a, b, tol = 1e-6, maxSteps = 20) {
       fc: Number(fc.toFixed(6)),
       interval: [a, b],
       chosen: fa * fc < 0 ? "left" : "right",
+      method: method,
     });
 
     if (Math.abs(fc) < tol || Math.abs(b - a) < tol) break;
@@ -189,15 +200,16 @@ function bisectionSteps(expr, a, b, tol = 1e-6, maxSteps = 20) {
   return steps;
 }
 
-// Updated default expression to match your sample problem
-const defaultExpr = "3*x^3+2*x^2+3";
+// Changed back to the original default expression you requested
+const defaultExpr = "-0.9*x^2 + 1.7*x + 2.5";
 
-export default function MetodeBiseksi() {
+export default function MetodeAkarPersamaan() {
+  const [method, setMethod] = useState("bisection");
   const [expr, setExpr] = useState(defaultExpr);
-  const [a, setA] = useState(1); // Changed to match your sample
-  const [b, setB] = useState(2); // Changed to match your sample
-  const [tol, setTol] = useState(0.01); // Changed to match your sample
-  const [maxSteps, setMaxSteps] = useState(20); // Increased default
+  const [a, setA] = useState(2.8); // Changed back to original values
+  const [b, setB] = useState(3);   // Changed back to original values
+  const [tol, setTol] = useState(1e-6); // Changed back to original tolerance
+  const [maxSteps, setMaxSteps] = useState(20);
   const [steps, setSteps] = useState([]);
   const [currentIteration, setCurrentIteration] = useState(0);
   const [showKeyboard, setShowKeyboard] = useState(false);
@@ -246,16 +258,23 @@ export default function MetodeBiseksi() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const s = bisectionSteps(
+    const s = rootFindingSteps(
       parsedExpr,
       Number(a),
       Number(b),
       Number(tol),
-      Number(maxSteps)
+      Number(maxSteps),
+      method
     );
     setSteps(s);
     setCurrentIteration(0);
     setShowKeyboard(false);
+  };
+
+  const handleMethodChange = (newMethod) => {
+    setMethod(newMethod);
+    setSteps([]); // Clear previous results when switching methods
+    setCurrentIteration(0);
   };
 
   const currentStep = steps[currentIteration] || {};
@@ -267,11 +286,41 @@ export default function MetodeBiseksi() {
   const chartB = Math.max(a, b) + chartMargin;
   const chartData = generateChartData(parsedExpr, chartA, chartB);
 
+  // Method-specific configurations
+  const methodConfig = {
+    bisection: {
+      title: "Metode Biseksi (Bisection Method)",
+      formula: "c = (a + b) / 2",
+      description: "Membagi interval menjadi dua bagian sama besar"
+    },
+    "regula-falsi": {
+      title: "Metode Regula Falsi (False Position Method)", 
+      formula: "c = (a⋅f(b) - b⋅f(a)) / (f(b) - f(a))",
+      description: "Menggunakan interpolasi linear untuk menentukan titik potong"
+    }
+  };
+
+  const getCCalculationText = () => {
+    if (method === "bisection") {
+      return `c = (a + b) / 2 = (${currentStep.a} + ${currentStep.b}) / 2 = ${currentStep.c}`;
+    } else {
+      return `c = (a⋅f(b) - b⋅f(a)) / (f(b) - f(a)) = (${currentStep.a}⋅${currentStep.fb} - ${currentStep.b}⋅${currentStep.fa}) / (${currentStep.fb} - ${currentStep.fa}) = ${currentStep.c}`;
+    }
+  };
+
   return (
     <Container size="xl" py="xl">
       <Paper shadow="md" radius="lg" p="xl" withBorder>
+        {/* Method Selection Tabs */}
+        <Tabs value={method} onTabChange={handleMethodChange} mb="xl">
+          <Tabs.List position="center">
+            <Tabs.Tab value="bisection">Metode Biseksi</Tabs.Tab>
+            <Tabs.Tab value="regula-falsi">Metode Regula Falsi</Tabs.Tab>
+          </Tabs.List>
+        </Tabs>
+
         <Title align="center" order={2} mb="md">
-          Metode Biseksi (Bisection Method)
+          {methodConfig[method].title}
         </Title>
 
         <form onSubmit={handleSubmit}>
@@ -297,7 +346,7 @@ export default function MetodeBiseksi() {
               {/* Input Field */}
               <Textarea
                 ref={textareaRef}
-                placeholder="Contoh: 3*x^3+2*x^2+3"
+                placeholder="Contoh: -0.9*x^2 + 1.7*x + 2.5"
                 value={expr}
                 onChange={(e) => {
                   setExpr(e.target.value);
@@ -353,7 +402,7 @@ export default function MetodeBiseksi() {
               )}
             </div>
 
-            {/* Updated parameter inputs to include tolerance and max iterations */}
+            {/* Parameter inputs */}
             <Group grow>
               <NumberInput
                 label="Batas bawah (a) *"
@@ -419,7 +468,7 @@ export default function MetodeBiseksi() {
           <Paper p="md" mt="md" withBorder style={{ backgroundColor: "#fff5f5" }}>
             <Group position="center">
               <Text size="lg" weight={600} color="red">
-                Error: f(a) × f(b) harus &lt; 0 untuk metode biseksi!
+                Error: f(a) × f(b) harus &lt; 0 untuk metode ini!
               </Text>
             </Group>
             <Text align="center" size="sm" color="dimmed" mt="xs">
@@ -437,7 +486,7 @@ export default function MetodeBiseksi() {
                     Iterasi {currentStep.step} dari {steps.length}
                   </Title>
                   <Badge color="blue" variant="light">
-                    Toleransi: {tol}
+                    {method === "bisection" ? "Biseksi" : "Regula Falsi"}
                   </Badge>
                 </Group>
                 <Divider mb="md" />
@@ -450,7 +499,7 @@ export default function MetodeBiseksi() {
                     <strong>Langkah 2.</strong> f(b) = f({currentStep.b}) = {currentStep.fb}
                   </Text>
                   <Text>
-                    <strong>Langkah 3.</strong> c = (a + b) / 2 = ({currentStep.a} + {currentStep.b}) / 2 = {currentStep.c}
+                    <strong>Langkah 3.</strong> {getCCalculationText()}
                   </Text>
                   <Text>
                     <strong>Langkah 4.</strong> f(c) = f({currentStep.c}) = {currentStep.fc}
@@ -545,15 +594,15 @@ export default function MetodeBiseksi() {
                   </LineChart>
                 </ResponsiveContainer>
                 <Text mt="md" size="sm" color="dimmed" align="center">
-                  Interval: [{currentStep.a}, {currentStep.b}]
+                  Interval: [{currentStep.a}, {currentStep.b}] | Metode: {method === "bisection" ? "Biseksi" : "Regula Falsi"}
                 </Text>
               </Paper>
             </Grid.Col>
 
-            {/* Right Side - Simple Reminder */}
+            {/* Right Side - Method-specific explanation */}
             <Grid.Col span={12} md={5}>
               <Card shadow="sm" radius="md" p="lg" withBorder>
-                <Title order={4} mb="md">Metode Biseksi</Title>
+                <Title order={4} mb="md">{methodConfig[method].title.split(' (')[0]}</Title>
                 <Divider mb="md" />
                 
                 <Stack spacing="sm">
@@ -562,12 +611,20 @@ export default function MetodeBiseksi() {
                   </Text>
                   
                   <Text size="sm">
+                    <strong>Formula:</strong> {methodConfig[method].formula}
+                  </Text>
+                  
+                  <Text size="xs" color="dimmed">
+                    {methodConfig[method].description}
+                  </Text>
+                  
+                  <Text size="sm">
                     <strong>Langkah-langkah:</strong>
                   </Text>
                   
                   <Box pl="md">
                     <Text size="sm">1. Hitung f(a) dan f(b)</Text>
-                    <Text size="sm">2. Tentukan c = (a + b) / 2</Text>
+                    <Text size="sm">2. Tentukan c menggunakan formula</Text>
                     <Text size="sm">3. Hitung f(c)</Text>
                     <Text size="sm">4. Pilih interval baru:</Text>
                     <Box pl="md">
