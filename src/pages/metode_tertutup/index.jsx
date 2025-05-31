@@ -568,83 +568,80 @@ export default function MetodeAkarPersamaan() {
               </Card>
 
               {/* Chart */}
-<Paper p="md" mt="md" withBorder>
-  <Button
-    size="xs"
-    variant="outline"
-    onClick={() => {
-      setZoomDomain(null);
-      setBrushRange([0, chartData.length - 1]);
-    }}
-    style={{ marginBottom: 8 }}
-  >
-    Reset Zoom
-  </Button>
-  <ResponsiveContainer width="100%" height={400}>
-    <LineChart
-      data={chartData}
-      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-    >
-      <CartesianGrid strokeDasharray="3 3" />
-      <XAxis
-        dataKey="x"
-        type="number"
-        domain={zoomDomain ? zoomDomain : [chartA, chartB]}
-      />
-      <YAxis />
-      <Tooltip
-        formatter={(value, name) => [value?.toFixed(4), "f(x)"]}
-        labelFormatter={(value) => `x = ${value?.toFixed(4)}`}
-      />
-      <Line
-        type="monotone"
-        dataKey="y"
-        stroke="#8884d8"
-        strokeWidth={2}
-        dot={false}
-      />
-      {/* Reference lines */}
-      <ReferenceLine x={0} stroke="#000" strokeDasharray="2 2" />
-      <ReferenceLine y={0} stroke="#000" strokeDasharray="2 2" />
-      <ReferenceLine
-        x={currentStep.a}
-        stroke="green"
-        strokeWidth={3}
-        label={{ value: `a = ${currentStep.a}`, position: "topLeft" }}
-      />
-      <ReferenceLine
-        x={currentStep.b}
-        stroke="orange"
-        strokeWidth={3}
-        label={{ value: `b = ${currentStep.b}`, position: "topRight" }}
-      />
-      <ReferenceLine
-        x={currentStep.c}
-        stroke="red"
-        strokeWidth={3}
-        label={{ value: `c = ${currentStep.c}`, position: "top" }}
-      />
-      <Brush
-        dataKey="x"
-        height={30}
-        stroke="#8884d8"
-        onChange={handleBrushChange}
-        startIndex={brushRange[0]}
-        endIndex={brushRange[1]}
-        travellerWidth={6}
-      />
-    </LineChart>
-  </ResponsiveContainer>
-  <Text mt="md" size="sm" color="dimmed" align="center">
-    {steps.length > 0 
-      ? `Interval: [${currentStep.a}, ${currentStep.b}] | Metode: ${method === "bisection" ? "Biseksi" : "Regula Falsi"}`
-      : "Grafik fungsi f(x)"
-    }
-  </Text>
-</Paper>
-
-
-
+              <Paper p="md" mt="md" withBorder>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  onClick={() => {
+                    setZoomDomain(null);
+                    setBrushRange([0, chartData.length - 1]);
+                  }}
+                  style={{ marginBottom: 8 }}
+                >
+                  Reset Zoom
+                </Button>
+                <ResponsiveContainer width="100%" height={400}>
+                  <LineChart
+                    data={chartData}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis
+                      dataKey="x"
+                      type="number"
+                      domain={zoomDomain ? zoomDomain : [chartA, chartB]}
+                    />
+                    <YAxis />
+                    <Tooltip
+                      formatter={(value, name) => [value?.toFixed(4), "f(x)"]}
+                      labelFormatter={(value) => `x = ${value?.toFixed(4)}`}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="y"
+                      stroke="#8884d8"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                    {/* Reference lines */}
+                    <ReferenceLine x={0} stroke="#000" strokeDasharray="2 2" />
+                    <ReferenceLine y={0} stroke="#000" strokeDasharray="2 2" />
+                    <ReferenceLine
+                      x={currentStep.a}
+                      stroke="green"
+                      strokeWidth={3}
+                      label={{ value: `a = ${currentStep.a}`, position: "topLeft" }}
+                    />
+                    <ReferenceLine
+                      x={currentStep.b}
+                      stroke="orange"
+                      strokeWidth={3}
+                      label={{ value: `b = ${currentStep.b}`, position: "topRight" }}
+                    />
+                    <ReferenceLine
+                      x={currentStep.c}
+                      stroke="red"
+                      strokeWidth={3}
+                      label={{ value: `c = ${currentStep.c}`, position: "top" }}
+                    />
+                    <Brush
+                      dataKey="x"
+                      height={30}
+                      stroke="#8884d8"
+                      onChange={handleBrushChange}
+                      startIndex={brushRange[0]}
+                      endIndex={brushRange[1]}
+                      travellerWidth={10}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+                <Text mt="md" size="sm" color="dimmed" align="center">
+                  {steps.length > 0 
+                    ? `Interval: [${currentStep.a}, ${currentStep.b}] | Metode: ${method === "bisection" ? "Biseksi" : "Regula Falsi"}`
+                    : "Grafik fungsi f(x)"
+                  }
+                </Text>
+              </Paper>
             </Grid.Col>
 
             {/* Right Side - Method-specific explanation */}
