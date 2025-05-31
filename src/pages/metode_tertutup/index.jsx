@@ -26,6 +26,8 @@ import {
   Tooltip,
   ReferenceLine,
   ResponsiveContainer,
+  Brush,
+
 } from "recharts";
 import { Backspace } from "@phosphor-icons/react";
 
@@ -214,9 +216,26 @@ export default function MetodeAkarPersamaan() {
   const [currentIteration, setCurrentIteration] = useState(0);
   const [showKeyboard, setShowKeyboard] = useState(false);
   const [cursorPosition, setCursorPosition] = useState(0);
-
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [zoomDomain, setZoomDomain] = useState(null);
+  
   const textareaRef = useRef(null);
   const parsedExpr = parseMathExpr(expr);
+
+  // Generate chart data
+  const chartMargin = Math.abs(b - a) * 0.3;
+  const chartA = Math.min(a, b) - chartMargin;
+  const chartB = Math.max(a, b) + chartMargin;
+  const chartData = generateChartData(parsedExpr, chartA, chartB, 10);
+
+  const [brushRange, setBrushRange] = useState([0, chartData.length - 1]);
+
+  // After you update chartData (e.g., after setExpr, setA, setB, etc)
+  React.useEffect(() => {
+    setZoomDomain(null);
+    setBrushRange([0, chartData.length - 1]);
+  }, [expr, a, b]);
+
 
   const handleKeyboardInput = (key) => {
     const { value, needsParens } = key;
@@ -251,6 +270,18 @@ export default function MetodeAkarPersamaan() {
     }
   };
 
+  const handleBrushChange = (e) => {
+  if (e && e.startIndex !== undefined && e.endIndex !== undefined) {
+    const startX = chartData[e.startIndex]?.x;
+    const endX = chartData[e.endIndex]?.x;
+    setZoomDomain([startX, endX]);
+    setBrushRange([e.startIndex, e.endIndex]);
+  } else {
+    setZoomDomain(null);
+    setBrushRange([0, chartData.length - 1]);
+  }
+};
+
   const handleClear = () => {
     setExpr("");
     setCursorPosition(0);
@@ -258,6 +289,7 @@ export default function MetodeAkarPersamaan() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    setHasSubmitted(true); // <-- add this
     const s = rootFindingSteps(
       parsedExpr,
       Number(a),
@@ -279,12 +311,6 @@ export default function MetodeAkarPersamaan() {
 
   const currentStep = steps[currentIteration] || {};
   const finalRoot = steps.length > 0 ? steps[steps.length - 1].c : null;
-
-  // Generate chart data
-  const chartMargin = Math.abs(b - a) * 0.3;
-  const chartA = Math.min(a, b) - chartMargin;
-  const chartB = Math.max(a, b) + chartMargin;
-  const chartData = generateChartData(parsedExpr, chartA, chartB);
 
   // Method-specific configurations
   const methodConfig = {
@@ -308,11 +334,12 @@ export default function MetodeAkarPersamaan() {
     }
   };
 
+
   return (
     <Container size="xl" py="xl">
       <Paper shadow="md" radius="lg" p="xl" withBorder>
         {/* Method Selection Tabs */}
-        <Tabs value={method} onTabChange={handleMethodChange} mb="xl">
+        <Tabs value={method} onChange={handleMethodChange} mb="xl">
           <Tabs.List position="center">
             <Tabs.Tab value="bisection">Metode Biseksi</Tabs.Tab>
             <Tabs.Tab value="regula-falsi">Metode Regula Falsi</Tabs.Tab>
@@ -464,7 +491,7 @@ export default function MetodeAkarPersamaan() {
         )}
 
         {/* Display error message if no valid interval */}
-        {steps.length === 0 && expr && a && b && (
+        {hasSubmitted && steps.length === 0 && expr && a && b && (
           <Paper p="md" mt="md" withBorder style={{ backgroundColor: "#fff5f5" }}>
             <Group position="center">
               <Text size="lg" weight={600} color="red">
@@ -541,62 +568,83 @@ export default function MetodeAkarPersamaan() {
               </Card>
 
               {/* Chart */}
-              <Paper p="md" mt="md" withBorder>
-                <ResponsiveContainer width="100%" height={400}>
-                  <LineChart 
-                    data={chartData} 
-                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="x" 
-                      type="number"
-                      scale="linear"
-                      domain={[chartA, chartB]}
-                    />
-                    <YAxis />
-                    <Tooltip 
-                      formatter={(value, name) => [value?.toFixed(4), "f(x)"]}
-                      labelFormatter={(value) => `x = ${value?.toFixed(4)}`}
-                    />
-                    
-                    <Line 
-                      type="monotone" 
-                      dataKey="y" 
-                      stroke="#8884d8" 
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                    
-                    {/* Reference lines */}
-                    <ReferenceLine x={0} stroke="#000" strokeDasharray="2 2" />
-                    <ReferenceLine y={0} stroke="#000" strokeDasharray="2 2" />
-                    
-                    {/* Current interval */}
-                    <ReferenceLine 
-                      x={currentStep.a} 
-                      stroke="green" 
-                      strokeWidth={3}
-                      label={{ value: `a = ${currentStep.a}`, position: "topLeft" }}
-                    />
-                    <ReferenceLine 
-                      x={currentStep.b} 
-                      stroke="orange" 
-                      strokeWidth={3}
-                      label={{ value: `b = ${currentStep.b}`, position: "topRight" }}
-                    />
-                    <ReferenceLine 
-                      x={currentStep.c} 
-                      stroke="red" 
-                      strokeWidth={3}
-                      label={{ value: `c = ${currentStep.c}`, position: "top" }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-                <Text mt="md" size="sm" color="dimmed" align="center">
-                  Interval: [{currentStep.a}, {currentStep.b}] | Metode: {method === "bisection" ? "Biseksi" : "Regula Falsi"}
-                </Text>
-              </Paper>
+<Paper p="md" mt="md" withBorder>
+  <Button
+    size="xs"
+    variant="outline"
+    onClick={() => {
+      setZoomDomain(null);
+      setBrushRange([0, chartData.length - 1]);
+    }}
+    style={{ marginBottom: 8 }}
+  >
+    Reset Zoom
+  </Button>
+  <ResponsiveContainer width="100%" height={400}>
+    <LineChart
+      data={chartData}
+      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+    >
+      <CartesianGrid strokeDasharray="3 3" />
+      <XAxis
+        dataKey="x"
+        type="number"
+        domain={zoomDomain ? zoomDomain : [chartA, chartB]}
+      />
+      <YAxis />
+      <Tooltip
+        formatter={(value, name) => [value?.toFixed(4), "f(x)"]}
+        labelFormatter={(value) => `x = ${value?.toFixed(4)}`}
+      />
+      <Line
+        type="monotone"
+        dataKey="y"
+        stroke="#8884d8"
+        strokeWidth={2}
+        dot={false}
+      />
+      {/* Reference lines */}
+      <ReferenceLine x={0} stroke="#000" strokeDasharray="2 2" />
+      <ReferenceLine y={0} stroke="#000" strokeDasharray="2 2" />
+      <ReferenceLine
+        x={currentStep.a}
+        stroke="green"
+        strokeWidth={3}
+        label={{ value: `a = ${currentStep.a}`, position: "topLeft" }}
+      />
+      <ReferenceLine
+        x={currentStep.b}
+        stroke="orange"
+        strokeWidth={3}
+        label={{ value: `b = ${currentStep.b}`, position: "topRight" }}
+      />
+      <ReferenceLine
+        x={currentStep.c}
+        stroke="red"
+        strokeWidth={3}
+        label={{ value: `c = ${currentStep.c}`, position: "top" }}
+      />
+      <Brush
+        dataKey="x"
+        height={30}
+        stroke="#8884d8"
+        onChange={handleBrushChange}
+        startIndex={brushRange[0]}
+        endIndex={brushRange[1]}
+        travellerWidth={6}
+      />
+    </LineChart>
+  </ResponsiveContainer>
+  <Text mt="md" size="sm" color="dimmed" align="center">
+    {steps.length > 0 
+      ? `Interval: [${currentStep.a}, ${currentStep.b}] | Metode: ${method === "bisection" ? "Biseksi" : "Regula Falsi"}`
+      : "Grafik fungsi f(x)"
+    }
+  </Text>
+</Paper>
+
+
+
             </Grid.Col>
 
             {/* Right Side - Method-specific explanation */}
