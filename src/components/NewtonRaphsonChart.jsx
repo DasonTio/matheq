@@ -9,7 +9,15 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { Paper, Title, Text, Group, Badge } from "@mantine/core";
+import {
+  Paper,
+  Title,
+  Text,
+  Group,
+  Badge,
+  SimpleGrid,
+  Card,
+} from "@mantine/core";
 
 const NewtonRaphsonChart = ({ data, equation }) => {
   const convergenceData = data.map((item) => ({
@@ -40,6 +48,28 @@ const NewtonRaphsonChart = ({ data, equation }) => {
     return null;
   };
 
+  // Custom Legend dengan spacing yang lebih baik
+  const CustomLegend = ({ payload }) => {
+    return (
+      <div className="flex flex-wrap justify-center gap-6 py-2">
+        {payload.map((entry, index) => (
+          <div key={index} className="flex items-center gap-2">
+            <div
+              className="w-4 h-0.5"
+              style={{ backgroundColor: entry.color }}
+            />
+            <span
+              className="text-sm font-medium"
+              style={{ color: entry.color }}
+            >
+              {entry.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <Paper shadow="sm" p="md" radius="md" mb="md">
       <Group justify="space-between" mb="md">
@@ -53,21 +83,25 @@ const NewtonRaphsonChart = ({ data, equation }) => {
         Grafik menunjukkan bagaimana nilai x dan error berkurang setiap iterasi
       </Text>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div>
-          <Text fw={500} mb="xs">
+      <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="lg">
+        {/* Chart 1: Konvergensi Nilai x */}
+        <Card shadow="xs" padding="md" radius="md" className="h-fit">
+          <Text fw={500} mb="sm" ta="center" c="blue">
             Konvergensi Nilai x
           </Text>
-          <div style={{ width: "100%", height: 250 }}>
+          <div style={{ width: "100%", height: 280 }}>
             <ResponsiveContainer>
-              <LineChart data={convergenceData}>
+              <LineChart
+                data={convergenceData}
+                margin={{ top: 10, right: 30, left: 20, bottom: 50 }}
+              >
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
                   dataKey="iteration"
                   label={{
                     value: "Iterasi",
                     position: "insideBottom",
-                    offset: -10,
+                    offset: -5,
                   }}
                 />
                 <YAxis
@@ -78,34 +112,41 @@ const NewtonRaphsonChart = ({ data, equation }) => {
                   }}
                 />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend />
+                <Legend
+                  content={<CustomLegend />}
+                  wrapperStyle={{ paddingTop: "10px" }}
+                />
                 <Line
                   type="monotone"
                   dataKey="x"
-                  stroke="#2563eb"
-                  strokeWidth={2}
-                  dot={{ fill: "#2563eb", strokeWidth: 2, r: 4 }}
+                  stroke="#1e40af"
+                  strokeWidth={3}
+                  dot={{ fill: "#1e40af", strokeWidth: 2, r: 5 }}
                   name="Nilai x"
                 />
               </LineChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </Card>
 
-        <div>
-          <Text fw={500} mb="xs">
+        {/* Chart 2: Penurunan Error */}
+        <Card shadow="xs" padding="md" radius="md" className="h-fit">
+          <Text fw={500} mb="sm" ta="center" c="red">
             Penurunan Error
           </Text>
-          <div style={{ width: "100%", height: 250 }}>
+          <div style={{ width: "100%", height: 280 }}>
             <ResponsiveContainer>
-              <LineChart data={convergenceData}>
+              <LineChart
+                data={convergenceData}
+                margin={{ top: 10, right: 30, left: 20, bottom: 50 }}
+              >
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
                   dataKey="iteration"
                   label={{
                     value: "Iterasi",
                     position: "insideBottom",
-                    offset: -10,
+                    offset: -5,
                   }}
                 />
                 <YAxis
@@ -118,85 +159,136 @@ const NewtonRaphsonChart = ({ data, equation }) => {
                   }}
                 />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend />
+                <Legend
+                  content={<CustomLegend />}
+                  wrapperStyle={{ paddingTop: "10px" }}
+                />
                 <Line
                   type="monotone"
                   dataKey="error"
                   stroke="#dc2626"
                   strokeWidth={2}
                   dot={{ fill: "#dc2626", strokeWidth: 2, r: 4 }}
-                  name="Error Absolut"
+                  name="Error"
                 />
                 <Line
                   type="monotone"
                   dataKey="fx"
-                  stroke="#ea580c"
+                  stroke="#eab308"
                   strokeWidth={2}
-                  dot={{ fill: "#ea580c", strokeWidth: 2, r: 4 }}
-                  name="Nilai f(x)"
+                  dot={{ fill: "#eab308", strokeWidth: 2, r: 4 }}
+                  name="f(x)"
                 />
               </LineChart>
             </ResponsiveContainer>
           </div>
+        </Card>
+      </SimpleGrid>
+
+      {/* Penjelasan */}
+      <div className="mt-6 space-y-4">
+        <div className="p-4 bg-blue-50 rounded-lg">
+          <Text size="sm" fw={500} mb="xs" c="blue">
+            📊 Interpretasi Grafik:
+          </Text>
+          <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+            <div>
+              <Text size="sm" fw={500} mb="xs">
+                Grafik Kiri:
+              </Text>
+              <ul className="text-sm text-gray-600 space-y-1">
+                <li>
+                  • <span className="text-blue-700 font-semibold">—</span>{" "}
+                  Menunjukkan nilai x mendekati akar
+                </li>
+                <li>• Garis mendatar = konvergensi tercapai</li>
+                <li>• Setiap titik = hasil iterasi</li>
+              </ul>
+            </div>
+            <div>
+              <Text size="sm" fw={500} mb="xs">
+                Grafik Kanan:
+              </Text>
+              <ul className="text-sm text-gray-600 space-y-1">
+                <li>
+                  • <span className="text-red-600 font-semibold">—</span> Error:
+                  selisih |x(n+1) - x(n)|
+                </li>
+                <li>
+                  • <span className="text-yellow-600 font-semibold">—</span>{" "}
+                  f(x): nilai fungsi
+                </li>
+                <li>• Skala log untuk melihat penurunan</li>
+              </ul>
+            </div>
+          </SimpleGrid>
         </div>
-      </div>
 
-      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-        <Text size="sm" fw={500} mb="xs">
-          💡 Interpretasi Grafik:
-        </Text>
-        <ul className="text-sm text-gray-600 space-y-1">
-          <li>
-            • <strong>Grafik kiri:</strong> Menunjukkan nilai x mendekati akar
-            persamaan
-          </li>
-          <li>
-            • <strong>Grafik kanan:</strong> Menunjukkan error yang semakin
-            mengecil (skala logaritmik)
-          </li>
-          <li>
-            • <strong>Error Absolut:</strong> Selisih antara x(n+1) dan x(n)
-          </li>
-          <li>
-            • <strong>Nilai f(x):</strong> Seberapa dekat nilai fungsi dengan
-            nol
-          </li>
-          <li>• Hover pada titik untuk melihat nilai detail</li>
-        </ul>
-      </div>
+        {/* Ringkasan Numerik */}
+        <div className="p-4 bg-green-50 rounded-lg">
+          <Text size="sm" fw={500} mb="xs" c="green">
+            🎯 Ringkasan Konvergensi:
+          </Text>
+          <SimpleGrid cols={{ base: 2, md: 4 }} spacing="md">
+            <div className="text-center">
+              <Text size="xs" c="dimmed">
+                Nilai Awal
+              </Text>
+              <Text fw={700} size="sm" c="blue">
+                {data[0]?.x.toFixed(4)}
+              </Text>
+            </div>
+            <div className="text-center">
+              <Text size="xs" c="dimmed">
+                Nilai Akhir
+              </Text>
+              <Text fw={700} size="sm" c="blue">
+                {data[data.length - 1]?.xNext.toFixed(4)}
+              </Text>
+            </div>
+            <div className="text-center">
+              <Text size="xs" c="dimmed">
+                Error Awal
+              </Text>
+              <Text fw={700} size="sm" c="red">
+                {data[0]?.error.toExponential(1)}
+              </Text>
+            </div>
+            <div className="text-center">
+              <Text size="xs" c="dimmed">
+                Error Akhir
+              </Text>
+              <Text fw={700} size="sm" c="red">
+                {data[data.length - 1]?.error.toExponential(1)}
+              </Text>
+            </div>
+          </SimpleGrid>
+        </div>
 
-      {/* Tabel ringkasan */}
-      <div className="mt-4 p-3 bg-green-50 rounded-lg">
-        <Text size="sm" fw={500} mb="xs">
-          📊 Ringkasan Konvergensi:
-        </Text>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-          <div>
-            <Text size="xs" c="dimmed">
-              Iterasi Pertama:
-            </Text>
-            <Text fw={500}>{data[0]?.x.toFixed(6)}</Text>
-          </div>
-          <div>
-            <Text size="xs" c="dimmed">
-              Iterasi Terakhir:
-            </Text>
-            <Text fw={500}>{data[data.length - 1]?.xNext.toFixed(6)}</Text>
-          </div>
-          <div>
-            <Text size="xs" c="dimmed">
-              Error Awal:
-            </Text>
-            <Text fw={500}>{data[0]?.error.toExponential(2)}</Text>
-          </div>
-          <div>
-            <Text size="xs" c="dimmed">
-              Error Akhir:
-            </Text>
-            <Text fw={500}>
-              {data[data.length - 1]?.error.toExponential(2)}
-            </Text>
-          </div>
+        {/* Tips Pembelajaran */}
+        <div className="p-4 bg-yellow-50 rounded-lg">
+          <Text size="sm" fw={500} mb="xs" c="orange">
+            💡 Tips Pembelajaran:
+          </Text>
+          <ul className="text-sm text-gray-600 space-y-1">
+            <li>
+              • Perhatikan bagaimana nilai x bergerak menuju akar persamaan
+            </li>
+            <li>
+              • <span className="text-red-600 font-semibold">Error merah</span>{" "}
+              yang menurun menunjukkan konvergensi yang baik
+            </li>
+            <li>
+              •{" "}
+              <span className="text-yellow-600 font-semibold">
+                Garis kuning f(x)
+              </span>{" "}
+              mendekati nol berarti x mendekati akar yang benar
+            </li>
+            <li>
+              • Coba ubah tebakan awal untuk melihat perbedaan jalur konvergensi
+            </li>
+          </ul>
         </div>
       </div>
     </Paper>
