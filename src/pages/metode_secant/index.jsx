@@ -16,7 +16,6 @@ import {
   Badge,
   ActionIcon,
   Textarea,
-  Tabs,
 } from "@mantine/core";
 import {
   LineChart,
@@ -28,7 +27,6 @@ import {
   ReferenceLine,
   ResponsiveContainer,
   Brush,
-
 } from "recharts";
 import { Backspace } from "@phosphor-icons/react";
 
@@ -81,7 +79,10 @@ const mathKeyboard = [
 // Parse math expression for evaluation
 function parseMathExpr(expr) {
   return expr
-    .replace(/(\d)\s*\(\s*x\^(\d+)\s*\)/g, (m, coef, pow) => `${coef}*Math.pow(x,${pow})`)
+    .replace(/(\d)\s*\(\s*x\^(\d+)\s*\)/g, (m, coef, pow) => 
+      `${coef}*Math.pow(x,${pow})`
+    )
+    .replace(/e\^\s*(-?\w+|\([^\)]+\))/g, (m, pow) => `Math.exp(${pow})`)
     .replace(/Math\.PI/g, Math.PI)
     .replace(/Math\.E/g, Math.E)
     .replace(/(\d*\.?\d*)x\^(\d+)/g, (m, coef, pow) =>
@@ -106,33 +107,22 @@ function userInputToMath(expr) {
 
   try {
     return expr
-      // Handle constants
       .replace(/Math\.PI/g, "π")
       .replace(/Math\.E/g, "e")
-      
-      // Handle functions
       .replace(/Math\.log10\(/g, "log(")
       .replace(/Math\.log\(/g, "ln(")
       .replace(/Math\.sin\(/g, "sin(")
       .replace(/Math\.cos\(/g, "cos(")
       .replace(/Math\.tan\(/g, "tan(")
       .replace(/Math\.sqrt\(/g, "√(")
-      
-      // Handle exponents - convert ^2 to superscript
       .replace(/\^2/g, "²")
       .replace(/\^3/g, "³")
       .replace(/\^(\d+)/g, (match, num) => {
         const superscriptMap = {'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹'};
         return num.split('').map(digit => superscriptMap[digit] || digit).join('');
       })
-      
-      // Handle multiplication
       .replace(/\*/g, " ⋅ ")
-      
-      // Handle division  
       .replace(/\//g, " ÷ ")
-      
-      // Clean up extra spaces
       .replace(/\s+/g, " ")
       .trim();
   } catch (error) {
@@ -142,14 +132,17 @@ function userInputToMath(expr) {
 
 function safeEval(expr, x) {
   try {
-    // Allow 'e' as Euler's number for user input like e^-x
+    // mathjs supports implicit multiplication, e, ^, etc.
+    // We define 'x' and 'e' in the scope for mathjs
     return evaluate(expr, { x, e: Math.E });
   } catch {
     return NaN;
   }
 }
 
-function generateChartData(expr, a, b, points = 100) {
+function generateChartData(expr, center, range = 2, points = 200) {
+  const a = center - range;
+  const b = center + range;
   const step = (b - a) / (points - 1);
   return Array.from({ length: points }, (_, i) => {
     const x = a + i * step;
@@ -157,61 +150,65 @@ function generateChartData(expr, a, b, points = 100) {
   });
 }
 
-// Updated function to handle both Bisection and Regula Falsi methods
-function rootFindingSteps(expr, a, b, tol = 1e-6, maxSteps = 20, method = "bisection") {
+// Secant method implementation
+function secantMethodSteps(expr, x0, x1, tol = 1e-6, maxSteps = 20) {
   const steps = [];
-  let fa = safeEval(expr, a);
-  let fb = safeEval(expr, b);
-
-  if (isNaN(fa) || isNaN(fb) || fa * fb > 0) return [];
+  let xPrev = x0;
+  let xCurr = x1;
 
   for (let i = 0; i < maxSteps; i++) {
-    let c;
-    
-    // The main difference between the two methods
-    if (method === "bisection") {
-      c = (a + b) / 2;
-    } else { // regula-falsi
-      c = (a * fb - b * fa) / (fb - fa);
-    }
-    
-    const fc = safeEval(expr, c);
+    const fPrev = safeEval(expr, xPrev);
+    const fCurr = safeEval(expr, xCurr);
+
+    if (isNaN(fPrev) || isNaN(fCurr)) break;
+
+    const slope = (fCurr - fPrev) / (xCurr - xPrev);
+    if (Math.abs(slope) < 1e-15) break;
+
+    const xNext = xCurr - fCurr / slope;
+    const fNext = safeEval(expr, xNext);
 
     steps.push({
       step: i + 1,
-      a: Number(a.toFixed(6)),
-      b: Number(b.toFixed(6)),
-      c: Number(c.toFixed(6)),
-      fa: Number(fa.toFixed(6)),
-      fb: Number(fb.toFixed(6)),
-      fc: Number(fc.toFixed(6)),
-      interval: [a, b],
-      chosen: fa * fc < 0 ? "left" : "right",
-      method: method,
+      xPrev: Number(xPrev.toFixed(8)),
+      xCurr: Number(xCurr.toFixed(8)),
+      xNext: Number(xNext.toFixed(8)),
+      fPrev: Number(fPrev.toFixed(8)),
+      fCurr: Number(fCurr.toFixed(8)),
+      fNext: Number(fNext.toFixed(8)),
+      slope: Number(slope.toFixed(8)),
+      error: Math.abs(xNext - xCurr),
+      relativeError: Math.abs((xNext - xCurr) / xNext) * 100
     });
 
-    if (Math.abs(fc) < tol || Math.abs(b - a) < tol) break;
+    if (Math.abs(fNext) < tol || Math.abs(xNext - xCurr) < tol) break;
 
-    if (fa * fc < 0) {
-      b = c;
-      fb = fc;
-    } else {
-      a = c;
-      fa = fc;
-    }
+    xPrev = xCurr;
+    xCurr = xNext;
   }
+
   return steps;
 }
 
-// Changed back to the original default expression you requested
-const defaultExpr = "-0.9*x^2 + 1.7*x + 2.5";
+// Generate secant line data for visualization
+function generateSecantLineData(slope, intercept, xStart, xEnd, points = 50) {
+  const step = (xEnd - xStart) / (points - 1);
+  return Array.from({ length: points }, (_, i) => {
+    const x = xStart + i * step;
+    return { 
+      x: Number(x.toFixed(6)), 
+      y: slope * x + intercept 
+    };
+  });
+}
 
-export default function MetodeAkarPersamaan() {
-  const [method, setMethod] = useState("bisection");
+const defaultExpr = "x^2 - x - 1";
+
+export default function MetodeSecant() {
   const [expr, setExpr] = useState(defaultExpr);
-  const [a, setA] = useState(2.8); // Changed back to original values
-  const [b, setB] = useState(3);   // Changed back to original values
-  const [tol, setTol] = useState(1e-6); // Changed back to original tolerance
+  const [x0, setX0] = useState(0.8);
+  const [x1, setX1] = useState(0.9);
+  const [tol, setTol] = useState(1e-6);
   const [maxSteps, setMaxSteps] = useState(20);
   const [steps, setSteps] = useState([]);
   const [currentIteration, setCurrentIteration] = useState(0);
@@ -222,20 +219,17 @@ export default function MetodeAkarPersamaan() {
   
   const textareaRef = useRef(null);
 
-  // Generate chart data
-  const chartMargin = Math.abs(b - a) * 0.3;
-  const chartA = Math.min(a, b) - chartMargin;
-  const chartB = Math.max(a, b) + chartMargin;
-  const chartData = generateChartData(expr, chartA, chartB, 10);
+  // Generate chart data centered around the initial guesses
+  const chartCenter = (x0 + x1) / 2;
+  const chartRange = Math.max(2, Math.abs(x1 - x0) * 3);
+  const chartData = generateChartData(expr, chartCenter, chartRange, 200);
 
   const [brushRange, setBrushRange] = useState([0, chartData.length - 1]);
 
-  // After you update chartData (e.g., after setExpr, setA, setB, etc)
   React.useEffect(() => {
     setZoomDomain(null);
     setBrushRange([0, chartData.length - 1]);
-  }, [expr, a, b]);
-
+  }, [expr, x0, x1]);
 
   const handleKeyboardInput = (key) => {
     const { value, needsParens } = key;
@@ -271,16 +265,16 @@ export default function MetodeAkarPersamaan() {
   };
 
   const handleBrushChange = (e) => {
-  if (e && e.startIndex !== undefined && e.endIndex !== undefined) {
-    const startX = chartData[e.startIndex]?.x;
-    const endX = chartData[e.endIndex]?.x;
-    setZoomDomain([startX, endX]);
-    setBrushRange([e.startIndex, e.endIndex]);
-  } else {
-    setZoomDomain(null);
-    setBrushRange([0, chartData.length - 1]);
-  }
-};
+    if (e && e.startIndex !== undefined && e.endIndex !== undefined) {
+      const startX = chartData[e.startIndex]?.x;
+      const endX = chartData[e.endIndex]?.x;
+      setZoomDomain([startX, endX]);
+      setBrushRange([e.startIndex, e.endIndex]);
+    } else {
+      setZoomDomain(null);
+      setBrushRange([0, chartData.length - 1]);
+    }
+  };
 
   const handleClear = () => {
     setExpr("");
@@ -289,66 +283,36 @@ export default function MetodeAkarPersamaan() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    setHasSubmitted(true); // <-- add this
-    const s = rootFindingSteps(
+    setHasSubmitted(true);
+    const s = secantMethodSteps(
       expr,
-      Number(a),
-      Number(b),
+      Number(x0),
+      Number(x1),
       Number(tol),
-      Number(maxSteps),
-      method
+      Number(maxSteps)
     );
     setSteps(s);
     setCurrentIteration(0);
     setShowKeyboard(false);
   };
 
-  const handleMethodChange = (newMethod) => {
-    setMethod(newMethod);
-    setSteps([]);
-    setCurrentIteration(0);
-    setHasSubmitted(false); // Hide error until next submit
-  };
-
   const currentStep = steps[currentIteration] || {};
-  const finalRoot = steps.length > 0 ? steps[steps.length - 1].c : null;
+  const finalRoot = steps.length > 0 ? steps[steps.length - 1].xNext : null;
 
-  // Method-specific configurations
-  const methodConfig = {
-    bisection: {
-      title: "Metode Biseksi (Bisection Method)",
-      formula: "c = (a + b) / 2",
-      description: "Membagi interval menjadi dua bagian sama besar"
-    },
-    "regula-falsi": {
-      title: "Metode Regula Falsi (False Position Method)", 
-      formula: "c = (a⋅f(b) - b⋅f(a)) / (f(b) - f(a))",
-      description: "Menggunakan interpolasi linear untuk menentukan titik potong"
-    }
-  };
-
-  const getCCalculationText = () => {
-    if (method === "bisection") {
-      return `c = (a + b) / 2 = (${currentStep.a} + ${currentStep.b}) / 2 = ${currentStep.c}`;
-    } else {
-      return `c = (a⋅f(b) - b⋅f(a)) / (f(b) - f(a)) = (${currentStep.a}⋅${currentStep.fb} - ${currentStep.b}⋅${currentStep.fa}) / (${currentStep.fb} - ${currentStep.fa}) = ${currentStep.c}`;
-    }
-  };
-
+  // Generate secant line data for current iteration
+  const secantLineData = currentStep.secantLine ? 
+    generateSecantLineData(
+      currentStep.slope,
+      currentStep.secantLine.intercept,
+      Math.min(currentStep.xPrev, currentStep.xCurr) - 0.5,
+      Math.max(currentStep.xPrev, currentStep.xCurr) + 0.5
+    ) : [];
 
   return (
     <Container size="xl" py="xl">
       <Paper shadow="md" radius="lg" p="xl" withBorder>
-        {/* Method Selection Tabs */}
-        <Tabs value={method} onChange={handleMethodChange} mb="xl">
-          <Tabs.List position="center">
-            <Tabs.Tab value="bisection">Metode Biseksi</Tabs.Tab>
-            <Tabs.Tab value="regula-falsi">Metode Regula Falsi</Tabs.Tab>
-          </Tabs.List>
-        </Tabs>
-
         <Title align="center" order={2} mb="md">
-          {methodConfig[method].title}
+          Metode Secant (Secant Method)
         </Title>
 
         <form onSubmit={handleSubmit}>
@@ -374,7 +338,7 @@ export default function MetodeAkarPersamaan() {
               {/* Input Field */}
               <Textarea
                 ref={textareaRef}
-                placeholder="Contoh: -0.9*x^2 + 1.7*x + 2.5"
+                placeholder="Contoh: x^2 - x - 1"
                 value={expr}
                 onChange={(e) => {
                   setExpr(e.target.value);
@@ -433,17 +397,17 @@ export default function MetodeAkarPersamaan() {
             {/* Parameter inputs */}
             <Group grow>
               <NumberInput
-                label="Batas bawah (a) *"
-                value={a}
-                onChange={setA}
+                label="Tebakan awal x₀ *"
+                value={x0}
+                onChange={setX0}
                 precision={4}
                 step={0.1}
                 required
               />
               <NumberInput
-                label="Batas atas (b) *"
-                value={b}
-                onChange={setB}
+                label="Tebakan kedua x₁ *"
+                value={x1}
+                onChange={setX1}
                 precision={4}
                 step={0.1}
                 required
@@ -452,7 +416,7 @@ export default function MetodeAkarPersamaan() {
 
             <Group grow>
               <NumberInput
-                label="Toleransi (e) *"
+                label="Toleransi (ε) *"
                 value={tol}
                 onChange={setTol}
                 precision={6}
@@ -472,7 +436,7 @@ export default function MetodeAkarPersamaan() {
             </Group>
 
             <Button type="submit" fullWidth size="lg">
-              Hitung
+              Hitung dengan Metode Secant
             </Button>
           </Stack>
         </form>
@@ -488,19 +452,22 @@ export default function MetodeAkarPersamaan() {
                 x ≈ {finalRoot}
               </Text>
             </Group>
+            <Text align="center" size="sm" color="dimmed" mt="xs">
+              Konvergen setelah {steps.length} iterasi
+            </Text>
           </Paper>
         )}
 
-        {/* Display error message if no valid interval */}
-        {hasSubmitted && steps.length === 0 && expr && a && b && (
+        {/* Display error message if calculation fails */}
+        {hasSubmitted && steps.length === 0 && expr && x0 !== null && x1 !== null && (
           <Paper p="md" mt="md" withBorder style={{ backgroundColor: "#fff5f5" }}>
             <Group position="center">
               <Text size="lg" weight={600} color="red">
-                Error: f(a) × f(b) harus &lt; 0 untuk metode ini!
+                Error: Metode tidak konvergen atau terjadi pembagian dengan nol!
               </Text>
             </Group>
             <Text align="center" size="sm" color="dimmed" mt="xs">
-              f({a}) = {safeEval(expr, a).toFixed(6)}, f({b}) = {safeEval(expr, b).toFixed(6)}
+              f({x0}) = {safeEval(parsedExpr, x0).toFixed(6)}, f({x1}) = {safeEval(parsedExpr, x1).toFixed(6)}
             </Text>
           </Paper>
         )}
@@ -514,34 +481,68 @@ export default function MetodeAkarPersamaan() {
                     Iterasi {currentStep.step} dari {steps.length}
                   </Title>
                   <Badge color="blue" variant="light">
-                    {method === "bisection" ? "Biseksi" : "Regula Falsi"}
+                    Metode Secant
                   </Badge>
                 </Group>
                 <Divider mb="md" />
                 
                 <Stack spacing="md">
                   <Text>
-                    <strong>Langkah 1.</strong> f(a) = f({currentStep.a}) = {currentStep.fa}
+                    <strong>Langkah 1.</strong> x₍ₙ₋₁₎ = {currentStep.xPrev}, f(x₍ₙ₋₁₎) = {currentStep.fPrev}
                   </Text>
                   <Text>
-                    <strong>Langkah 2.</strong> f(b) = f({currentStep.b}) = {currentStep.fb}
+                    <strong>Langkah 2.</strong> xₙ = {currentStep.xCurr}, f(xₙ) = {currentStep.fCurr}
                   </Text>
                   <Text>
-                    <strong>Langkah 3.</strong> {getCCalculationText()}
+                    <strong>Langkah 3.</strong> Hitung gradien garis secant:
                   </Text>
+                  <Box pl="md">
+                    <Text size="sm" style={{ fontFamily: 'monospace' }}>
+                      f'(xₙ) ≈ [f(xₙ) - f(x₍ₙ₋₁₎)] / [xₙ - x₍ₙ₋₁₎]
+                    </Text>
+                    <Text size="sm" style={{ fontFamily: 'monospace' }}>
+                      f'({currentStep.xCurr}) ≈ [{currentStep.fCurr} - {currentStep.fPrev}] / [{currentStep.xCurr} - {currentStep.xPrev}]
+                    </Text>
+                    <Text size="sm" style={{ fontFamily: 'monospace' }}>
+                      f'({currentStep.xCurr}) ≈ {currentStep.slope}
+                    </Text>
+                  </Box>
                   <Text>
-                    <strong>Langkah 4.</strong> f(c) = f({currentStep.c}) = {currentStep.fc}
+                    <strong>Langkah 4.</strong> Hitung x₍ₙ₊₁₎ menggunakan rumus Secant:
+                  </Text>
+                  <Box pl="md">
+                    <Text size="sm" style={{ fontFamily: 'monospace' }}>
+                      x₍ₙ₊₁₎ = xₙ - f(xₙ) / f'(xₙ)
+                    </Text>
+                    <Text size="sm" style={{ fontFamily: 'monospace' }}>
+                      x₍ₙ₊₁₎ = {currentStep.xCurr} - {currentStep.fCurr} / {currentStep.slope}
+                    </Text>
+                    <Text size="sm" style={{ fontFamily: 'monospace' }}>
+                      x₍ₙ₊₁₎ = {currentStep.xNext}
+                    </Text>
+                  </Box>
+                  <Text>
+                    <strong>Langkah 5.</strong> f(x₍ₙ₊₁₎) = f({currentStep.xNext}) = {currentStep.fNext}
                   </Text>
                   
                   {/* Show convergence check */}
                   <Box p="sm" style={{ backgroundColor: "#f8f9fa", borderRadius: 4 }}>
                     <Text size="sm">
-                      <strong>Cek konvergensi:</strong> |f(c)| = |{currentStep.fc}| = {Math.abs(currentStep.fc).toFixed(6)}
+                      <strong>Cek konvergensi:</strong>
                     </Text>
-                    <Text size="xs" color={Math.abs(currentStep.fc) < tol ? "green" : "orange"}>
-                      {Math.abs(currentStep.fc) < tol 
-                        ? `✓ |f(c)| < ${tol} → Konvergen!` 
-                        : `✗ |f(c)| ≥ ${tol} → Lanjut iterasi`
+                    <Text size="xs">
+                      |f(x₍ₙ₊₁₎)| = |{currentStep.fNext}| = {Math.abs(currentStep.fNext).toFixed(6)}
+                    </Text>
+                    <Text size="xs">
+                      |x₍ₙ₊₁₎ - xₙ| = |{currentStep.xNext} - {currentStep.xCurr}| = {currentStep.error.toFixed(6)}
+                    </Text>
+                    <Text size="xs">
+                      Error relatif = {currentStep.relativeError.toFixed(4)}%
+                    </Text>
+                    <Text size="xs" color={Math.abs(currentStep.fNext) < tol ? "green" : "orange"}>
+                      {Math.abs(currentStep.fNext) < tol 
+                        ? `✓ |f(x₍ₙ₊₁₎)| < ${tol} → Konvergen!` 
+                        : `✗ |f(x₍ₙ₊₁₎)| ≥ ${tol} → Lanjut iterasi`
                       }
                     </Text>
                   </Box>
@@ -590,41 +591,62 @@ export default function MetodeAkarPersamaan() {
                     <XAxis
                       dataKey="x"
                       type="number"
-                      domain={zoomDomain ? zoomDomain : [chartA, chartB]}
+                      domain={zoomDomain ? zoomDomain : ['dataMin', 'dataMax']}
                     />
                     <YAxis />
                     <Tooltip
                       formatter={(value, name) => [value?.toFixed(4), "f(x)"]}
                       labelFormatter={(value) => `x = ${value?.toFixed(4)}`}
                     />
+                    
+                    {/* Function curve */}
                     <Line
                       type="monotone"
                       dataKey="y"
                       stroke="#8884d8"
                       strokeWidth={2}
                       dot={false}
+                      name="f(x)"
                     />
+                    
+                    {/* Secant line */}
+                    {secantLineData.length > 0 && (
+                      <Line
+                        data={secantLineData}
+                        type="monotone"
+                        dataKey="y"
+                        stroke="#ff7300"
+                        strokeWidth={2}
+                        strokeDasharray="5 5"
+                        dot={false}
+                        name="Garis Secant"
+                      />
+                    )}
+                    
                     {/* Reference lines */}
                     <ReferenceLine x={0} stroke="#000" strokeDasharray="2 2" />
                     <ReferenceLine y={0} stroke="#000" strokeDasharray="2 2" />
+                    
+                    {/* Current iteration points */}
                     <ReferenceLine
-                      x={currentStep.a}
+                      x={currentStep.xPrev}
                       stroke="green"
                       strokeWidth={3}
-                      label={{ value: `a = ${currentStep.a}`, position: "topLeft" }}
+                      label={{ value: `x₍ₙ₋₁₎ = ${currentStep.xPrev}`, position: "topLeft" }}
                     />
                     <ReferenceLine
-                      x={currentStep.b}
+                      x={currentStep.xCurr}
                       stroke="orange"
                       strokeWidth={3}
-                      label={{ value: `b = ${currentStep.b}`, position: "topRight" }}
+                      label={{ value: `xₙ = ${currentStep.xCurr}`, position: "top" }}
                     />
                     <ReferenceLine
-                      x={currentStep.c}
+                      x={currentStep.xNext}
                       stroke="red"
                       strokeWidth={3}
-                      label={{ value: `c = ${currentStep.c}`, position: "top" }}
+                      label={{ value: `x₍ₙ₊₁₎ = ${currentStep.xNext}`, position: "topRight" }}
                     />
+                    
                     <Brush
                       dataKey="x"
                       height={30}
@@ -638,30 +660,31 @@ export default function MetodeAkarPersamaan() {
                 </ResponsiveContainer>
                 <Text mt="md" size="sm" color="dimmed" align="center">
                   {steps.length > 0 
-                    ? `Interval: [${currentStep.a}, ${currentStep.b}] | Metode: ${method === "bisection" ? "Biseksi" : "Regula Falsi"}`
+                    ? `Iterasi ${currentStep.step}: Garis secant menghubungkan (${currentStep.xPrev}, ${currentStep.fPrev}) dan (${currentStep.xCurr}, ${currentStep.fCurr})`
                     : "Grafik fungsi f(x)"
                   }
                 </Text>
               </Paper>
             </Grid.Col>
 
-            {/* Right Side - Method-specific explanation */}
+            {/* Right Side - Method explanation */}
             <Grid.Col span={12} md={5}>
               <Card shadow="sm" radius="md" p="lg" withBorder>
-                <Title order={4} mb="md">{methodConfig[method].title.split(' (')[0]}</Title>
+                <Title order={4} mb="md">Metode Secant</Title>
                 <Divider mb="md" />
                 
                 <Stack spacing="sm">
                   <Text size="sm">
-                    <strong>Syarat:</strong> f(a) × f(b) &lt; 0
+                    <strong>Rumus:</strong> x₍ₙ₊₁₎ = xₙ - f(xₙ) × [xₙ - x₍ₙ₋₁₎] / [f(xₙ) - f(x₍ₙ₋₁₎)]
                   </Text>
                   
                   <Text size="sm">
-                    <strong>Formula:</strong> {methodConfig[method].formula}
+                    <strong>Gradien Secant:</strong> f'(xₙ) ≈ [f(xₙ) - f(x₍ₙ₋₁₎)] / [xₙ - x₍ₙ₋₁₎]
                   </Text>
                   
                   <Text size="xs" color="dimmed">
-                    {methodConfig[method].description}
+                    Metode Secant menggunakan dua titik untuk memperkirakan gradien, 
+                    tidak memerlukan turunan eksplisit seperti metode Newton-Raphson.
                   </Text>
                   
                   <Text size="sm">
@@ -669,30 +692,27 @@ export default function MetodeAkarPersamaan() {
                   </Text>
                   
                   <Box pl="md">
-                    <Text size="sm">1. Hitung f(a) dan f(b)</Text>
-                    <Text size="sm">2. Tentukan c menggunakan formula</Text>
-                    <Text size="sm">3. Hitung f(c)</Text>
-                    <Text size="sm">4. Pilih interval baru:</Text>
-                    <Box pl="md">
-                      <Text size="xs" color="dimmed">• Jika f(a) × f(c) &lt; 0 → [a, c]</Text>
-                      <Text size="xs" color="dimmed">• Jika f(c) × f(b) &lt; 0 → [c, b]</Text>
-                    </Box>
-                    <Text size="sm">5. Ulangi hingga |f(c)| &lt; toleransi</Text>
+                    <Text size="sm">1. Mulai dengan dua tebakan x₀ dan x₁</Text>
+                    <Text size="sm">2. Hitung f(x₀) dan f(x₁)</Text>
+                    <Text size="sm">3. Hitung gradien garis secant</Text>
+                    <Text size="sm">4. Hitung x₂ menggunakan rumus secant</Text>
+                    <Text size="sm">5. Set x₀ = x₁, x₁ = x₂</Text>
+                    <Text size="sm">6. Ulangi hingga konvergen</Text>
                   </Box>
                   
                   <Divider my="sm" />
                   
                   <Text size="sm">
-                    <strong>Status saat ini:</strong>
+                    <strong>Status iterasi saat ini:</strong>
                   </Text>
                   <Text size="xs" color="dimmed">
-                    f(a) × f(c) = {(currentStep.fa * currentStep.fc).toFixed(6)}
+                    Gradien secant: {currentStep.slope?.toFixed(6)}
                   </Text>
                   <Text size="xs" color="dimmed">
-                    f(c) × f(b) = {(currentStep.fc * currentStep.fb).toFixed(6)}
+                    Error absolut: {currentStep.error?.toFixed(6)}
                   </Text>
-                  <Text size="xs" weight={500} color={currentStep.chosen === "left" ? "green" : "orange"}>
-                    Pilih interval: {currentStep.chosen === "left" ? "[a, c]" : "[c, b]"}
+                  <Text size="xs" color="dimmed">
+                    Error relatif: {currentStep.relativeError?.toFixed(4)}%
                   </Text>
                 </Stack>
               </Card>
@@ -717,11 +737,33 @@ export default function MetodeAkarPersamaan() {
                           Iterasi {step.step}
                         </Text>
                         <Text size="xs" color="dimmed">
-                          c = {step.c}
+                          x = {step.xNext}
                         </Text>
                       </Group>
+                      <Text size="xs" color="dimmed">
+                        Error: {step.error.toFixed(6)}
+                      </Text>
                     </Box>
                   ))}
+                </Stack>
+              </Card>
+
+              {/* Convergence Analysis */}
+              <Card shadow="sm" radius="md" p="lg" withBorder mt="md">
+                <Title order={5} mb="md">Analisis Konvergensi</Title>
+                <Stack spacing="xs">
+                  <Text size="sm">
+                    <strong>Orde konvergensi:</strong> ≈ 1.618 (Golden Ratio)
+                  </Text>
+                  <Text size="sm">
+                    <strong>Kecepatan:</strong> Lebih cepat dari Bisection, lebih lambat dari Newton-Raphson
+                  </Text>
+                  <Text size="sm">
+                    <strong>Keunggulan:</strong> Tidak memerlukan turunan fungsi
+                  </Text>
+                  <Text size="sm">
+                    <strong>Kelemahan:</strong> Memerlukan dua tebakan awal
+                  </Text>
                 </Stack>
               </Card>
             </Grid.Col>
