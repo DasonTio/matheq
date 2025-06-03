@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { evaluate, parse } from "mathjs";
+import { evaluate } from "mathjs";
 import {
   Container,
   Paper,
