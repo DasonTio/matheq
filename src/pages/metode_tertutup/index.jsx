@@ -1,4 +1,5 @@
 import React, { useState, useRef } from "react";
+import { evaluate } from "mathjs";
 import {
   Container,
   Paper,
@@ -141,8 +142,8 @@ function userInputToMath(expr) {
 
 function safeEval(expr, x) {
   try {
-    // eslint-disable-next-line no-new-func
-    return Function("x", `return ${expr}`)(x);
+    // Allow 'e' as Euler's number for user input like e^-x
+    return evaluate(expr, { x, e: Math.E });
   } catch {
     return NaN;
   }
@@ -220,13 +221,12 @@ export default function MetodeAkarPersamaan() {
   const [zoomDomain, setZoomDomain] = useState(null);
   
   const textareaRef = useRef(null);
-  const parsedExpr = parseMathExpr(expr);
 
   // Generate chart data
   const chartMargin = Math.abs(b - a) * 0.3;
   const chartA = Math.min(a, b) - chartMargin;
   const chartB = Math.max(a, b) + chartMargin;
-  const chartData = generateChartData(parsedExpr, chartA, chartB, 10);
+  const chartData = generateChartData(expr, chartA, chartB, 10);
 
   const [brushRange, setBrushRange] = useState([0, chartData.length - 1]);
 
@@ -291,7 +291,7 @@ export default function MetodeAkarPersamaan() {
     e.preventDefault();
     setHasSubmitted(true); // <-- add this
     const s = rootFindingSteps(
-      parsedExpr,
+      expr,
       Number(a),
       Number(b),
       Number(tol),
@@ -305,8 +305,9 @@ export default function MetodeAkarPersamaan() {
 
   const handleMethodChange = (newMethod) => {
     setMethod(newMethod);
-    setSteps([]); // Clear previous results when switching methods
+    setSteps([]);
     setCurrentIteration(0);
+    setHasSubmitted(false); // Hide error until next submit
   };
 
   const currentStep = steps[currentIteration] || {};
@@ -499,7 +500,7 @@ export default function MetodeAkarPersamaan() {
               </Text>
             </Group>
             <Text align="center" size="sm" color="dimmed" mt="xs">
-              f({a}) = {safeEval(parsedExpr, a).toFixed(6)}, f({b}) = {safeEval(parsedExpr, b).toFixed(6)}
+              f({a}) = {safeEval(expr, a).toFixed(6)}, f({b}) = {safeEval(expr, b).toFixed(6)}
             </Text>
           </Paper>
         )}
