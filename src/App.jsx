@@ -4,19 +4,22 @@ import {
   Route,
   RouterProvider,
 } from "react-router-dom";
+import MetodeTertutup from "./pages/metode_tertutup";
+import MetodeSecant from "./pages/metode_secant";
+import NewtonRaphsonPage from "./pages/newton-raphson";
 import HomePage from "./pages/Home";
-import LoginPage from "./pages/login";
 import IterationPage from "./pages/iteration"
-import Layout from "./components/Layout";
 import StoryPage from "./pages/story";
 
 const router = createBrowserRouter(
   createRoutesFromElements(
     <Route path="/">
       <Route index element={<HomePage />} />
-      <Route path="/iteration" element={<IterationPage />} />
-      <Route path="/login" element={<LoginPage />} />
       <Route path="/story" element={<StoryPage />} />
+      <Route path="/metode_iterasi" element={<IterationPage />} />
+      <Route path="/metode_tertutup" element={<MetodeTertutup />} />
+      <Route path="/metode_secant" element={<MetodeSecant />} />
+      <Route path="/newton_raphson" element={<NewtonRaphsonPage />} />
     </Route>
   )
 );

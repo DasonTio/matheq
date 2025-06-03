@@ -11,7 +11,7 @@ const formatNumberForAxis = (value) => {
   return Number.isInteger(fixed) ? fixed.toString() : fixed;
 };
 
-export default function IterationChart({
+export default function FixedIterationChart({
   data, // Expects data points with x, g_x (for g(x)), y_equals_x (for y=x), and iterationMark
   xAxisLabel = "x",
   yAxisLabel = "y",

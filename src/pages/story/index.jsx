@@ -25,10 +25,10 @@ export default function StoryPage() {
         <RootEquation />
         <ClosedMethod />
         <Carousel.Slide className='grid grid-cols-2 h-full'>
-          <NavCard image={BiseksiNRegula} label={"Bisection & RegulaFalsi"} url={"/metode-tertutup"} />
-          <NavCard image={MetodeIterasi} label={"Metode Iterasi Titik Tetap"} url={"/iteration"} />
-          <NavCard image={MetodeNewtonRaphson} label={"Newton Raphson"} url={"/newton-raphson"} />
-          <NavCard image={MetodeSecant} label={"Metode Secant"} url={"/secant"} />
+          <NavCard image={BiseksiNRegula} label={"Bisection & RegulaFalsi"} url={"/metode_tertutup"} />
+          <NavCard image={MetodeIterasi} label={"Metode Iterasi Titik Tetap"} url={"/metode_iterasi"} />
+          <NavCard image={MetodeNewtonRaphson} label={"Newton Raphson"} url={"/newton_raphson"} />
+          <NavCard image={MetodeSecant} label={"Metode Secant"} url={"/metode_secant"} />
         </Carousel.Slide>
       </Carousel>
     </main>

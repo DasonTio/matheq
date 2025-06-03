@@ -10,7 +10,7 @@ const formatNumber = (num) => {
   return num;
 };
 
-export default function IterationTable({ data }) {
+export default function FixedIterationTable({ data }) {
   if (!data || data.length === 0) {
     return null;
   }
