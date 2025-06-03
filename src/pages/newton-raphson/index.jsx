@@ -1,280 +1,280 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
+  Container,
+  Title,
+  Paper,
   TextInput,
-  NumberInput,
   Button,
   Group,
-  Box,
-  Title,
-  Table,
+  Alert,
   Text,
+  Divider,
+  Grid,
+  Card,
+  Badge,
+  NumberInput,
 } from "@mantine/core";
+import { useForm } from "@mantine/form";
+import { Warning, Function, Target } from "@phosphor-icons/react";
+import { evaluate, derivative, parse } from "mathjs";
 import Latex from "react-latex";
-import * as math from "mathjs";
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  ReferenceLine,
-  ReferenceDot,
-  Tooltip,
-  Legend,
-} from "recharts";
+import FormulaExplanation from "../../components/FormulaExplanation";
+import IterationTable from "../../components/IterationTable";
+import NewtonRaphsonChart from "../../components/NewtonRaphsonChart";
 
-export default function NewtonRaphsonPage() {
-  const [funcString, setFuncString] = useState("x^4 + x^3 - 4x - 5");
-  const [x0, setX0] = useState(1);
-  const [tolerance, setTolerance] = useState(1e-7);
-  const [maxIter, setMaxIter] = useState(10);
-
-  const [iterations, setIterations] = useState([]);
-  const [chartData, setChartData] = useState([]);
-  const [dfLatex, setDfLatex] = useState("");
+const NewtonRaphsonPage = () => {
+  const [results, setResults] = useState([]);
   const [error, setError] = useState("");
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [convergenceInfo, setConvergenceInfo] = useState(null);
 
-  const handleSubmit = () => {
-    setError("");
-    try {
-      // Parse dan kompilasi f dan f'
-      const fNode = math.parse(funcString);
-      const f = fNode.compile();
-      const dfNode = math.derivative(fNode, "x");
-      const df = dfNode.compile();
-      setDfLatex(dfNode.toTex());
-
-      // Newton–Raphson iterasi
-      let xi = x0;
-      const iters = [];
-      for (let i = 0; i < maxIter; i++) {
-        const fxi = f.evaluate({ x: xi });
-        const dfxi = df.evaluate({ x: xi });
-        if (Math.abs(dfxi) < 1e-12) {
-          throw new Error("Turunan mendekati nol, iterasi dihentikan.");
+  const form = useForm({
+    initialValues: {
+      equation: "x^3 - 2*x - 5",
+      initialGuess: 2,
+      tolerance: 0.0001,
+      maxIterations: 20,
+    },
+    validate: {
+      equation: (value) => {
+        try {
+          parse(value);
+          return null;
+        } catch {
+          return "Persamaan tidak valid";
         }
-        const xNext = xi - fxi / dfxi;
-        iters.push({ i, xi, fxi, dfxi, xNext });
-        if (Math.abs(xNext - xi) < tolerance) break;
-        xi = xNext;
-      }
-      setIterations(iters);
+      },
+      tolerance: (value) =>
+        value <= 0 ? "Toleransi harus lebih besar dari 0" : null,
+      maxIterations: (value) =>
+        value < 1 ? "Maksimal iterasi minimal 1" : null,
+    },
+  });
 
-      // Siapkan data untuk plot f(x) dan segmen-segmen tangen
-      const delta = 1; // panjang segmen tangen ke kiri/kanan
-      const xsIter = iters.map((r) => r.xi);
-      const xMin = Math.min(...xsIter) - delta * 1.5;
-      const xMax = Math.max(...xsIter) + delta * 1.5;
-      const samples = 200;
-      const step = (xMax - xMin) / samples;
+  const calculateNewtonRaphson = (values) => {
+    setIsCalculating(true);
+    setError("");
 
-      const data = [];
-      for (let j = 0; j <= samples; j++) {
-        const x = xMin + j * step;
-        const point = { x, fx: f.evaluate({ x }) };
-        // untuk setiap iterasi, hitung nilai tangen di [xi - delta, xi + delta]
-        iters.forEach(({ xi, fxi, dfxi }, idx) => {
-          const key = `tan${idx}`;
-          if (x >= xi - delta && x <= xi + delta) {
-            point[key] = dfxi * (x - xi) + fxi;
-          } else {
-            point[key] = null;
-          }
+    try {
+      const { equation, initialGuess, tolerance, maxIterations } = values;
+      const iterations = [];
+      let x = parseFloat(initialGuess);
+      let iteration = 0;
+      let converged = false;
+
+      // Parse equation untuk mendapatkan turunan
+      const expr = parse(equation);
+      const derivativeExpr = derivative(expr, "x");
+
+      while (iteration < maxIterations && !converged) {
+        const fx = evaluate(equation, { x });
+        const fpx = evaluate(derivativeExpr.toString(), { x });
+
+        if (Math.abs(fpx) < 1e-12) {
+          setError(
+            "Turunan mendekati nol. Metode Newton-Raphson tidak dapat dilanjutkan."
+          );
+          setIsCalculating(false);
+          return;
+        }
+
+        const xNext = x - fx / fpx;
+        const error = Math.abs(xNext - x);
+
+        iterations.push({
+          iteration: iteration + 1,
+          x: x,
+          fx: fx,
+          fpx: fpx,
+          xNext: xNext,
+          error: error,
         });
-        data.push(point);
+
+        if (error < tolerance) {
+          converged = true;
+          setConvergenceInfo({
+            converged: true,
+            finalValue: xNext,
+            iterations: iteration + 1,
+            finalError: error,
+          });
+        }
+
+        x = xNext;
+        iteration++;
       }
 
-      setChartData(data);
+      if (!converged) {
+        setConvergenceInfo({
+          converged: false,
+          finalValue: x,
+          iterations: iteration,
+          finalError: iterations[iterations.length - 1]?.error || 0,
+        });
+      }
+
+      setResults(iterations);
     } catch (err) {
-      setError(err.message);
+      setError("Terjadi kesalahan dalam perhitungan: " + err.message);
     }
+
+    setIsCalculating(false);
+  };
+
+  const handleSubmit = (values) => {
+    calculateNewtonRaphson(values);
+  };
+
+  const presetExamples = [
+    { name: "x³ - 2x - 5 = 0", equation: "x^3 - 2*x - 5", guess: 2 },
+    { name: "x² - 4 = 0", equation: "x^2 - 4", guess: 1 },
+    { name: "cos(x) - x = 0", equation: "cos(x) - x", guess: 0.5 },
+    { name: "e^x - 2x - 1 = 0", equation: "exp(x) - 2*x - 1", guess: 1 },
+  ];
+
+  const loadExample = (example) => {
+    form.setValues({
+      ...form.values,
+      equation: example.equation,
+      initialGuess: example.guess,
+    });
   };
 
   return (
-    <Box className="p-6">
-      <Title order={2} mb="md">
-        Metode Newton–Raphson
+    <Container size="xl" py="xl">
+      <Title order={1} ta="center" mb="xl" c="blue">
+        🧮 Pembelajaran Metode Newton-Raphson
       </Title>
-      <div className="flex flex-col gap-4 max-w-lg">
-        <TextInput
-          label="Fungsi f(x)"
-          placeholder="misal: x^3 - x - 2"
-          value={funcString}
-          onChange={(e) => setFuncString(e.currentTarget.value)}
-        />
-        <NumberInput
-          label="Tebakan awal x₀"
-          value={x0}
-          onChange={(val) => setX0(val)}
-        />
-        <NumberInput
-          label="Toleransi"
-          precision={10}
-          value={tolerance}
-          onChange={(val) => setTolerance(val)}
-        />
-        <NumberInput
-          label="Maksimum iterasi"
-          value={maxIter}
-          onChange={(val) => setMaxIter(val)}
-        />
-        <Group position="right" mt="md">
-          <Button onClick={handleSubmit}>Hitung</Button>
-        </Group>
-        {error && (
-          <Text color="red" size="sm">
-            {error}
-          </Text>
-        )}
-      </div>
 
-      {chartData.length > 0 && (
-        <Box mt="8">
-          <Title order={4} mb="sm">
-            Hasil Perhitungan
-          </Title>
+      <Text ta="center" size="lg" mb="xl" c="dimmed">
+        Pelajari bagaimana metode Newton-Raphson bekerja secara visual dan
+        interaktif
+      </Text>
 
-          <div className="mb-4 flex flex-col space-y-2">
-            <Latex>{`$$f(x) = ${funcString}$$`}</Latex>
-            <Latex>{`$$f'(x) = ${dfLatex}$$`}</Latex>
-          </div>
+      <Grid>
+        <Grid.Col span={{ base: 12, md: 4 }}>
+          <Paper shadow="sm" p="md" radius="md">
+            <Title order={3} mb="md">
+              <Function size={24} style={{ marginRight: 8 }} />
+              Input Parameter
+            </Title>
 
-          <ResponsiveContainer width="100%" height={400}>
-            <LineChart
-              data={chartData}
-              margin={{ top: 20, right: 40, bottom: 20, left: 40 }}
+            <form onSubmit={form.onSubmit(handleSubmit)}>
+              <TextInput
+                label="Persamaan f(x) = 0"
+                placeholder="Contoh: x^3 - 2*x - 5"
+                {...form.getInputProps("equation")}
+                mb="md"
+                description="Gunakan sintaks JavaScript (^, *, /, +, -, sin, cos, exp, log, dll)"
+              />
+
+              <NumberInput
+                label="Tebakan Awal (x₀)"
+                placeholder="2"
+                {...form.getInputProps("initialGuess")}
+                mb="md"
+                step={0.1}
+              />
+
+              <NumberInput
+                label="Toleransi Error"
+                placeholder="0.0001"
+                {...form.getInputProps("tolerance")}
+                mb="md"
+                step={0.0001}
+                decimalScale={6}
+              />
+
+              <NumberInput
+                label="Maksimal Iterasi"
+                placeholder="20"
+                {...form.getInputProps("maxIterations")}
+                mb="md"
+                min={1}
+                max={100}
+              />
+
+              <Button
+                type="submit"
+                fullWidth
+                loading={isCalculating}
+                leftSection={<Target size={16} />}
+              >
+                Hitung Newton-Raphson
+              </Button>
+            </form>
+
+            <Divider my="md" />
+
+            <Text size="sm" fw={500} mb="xs">
+              Contoh Persamaan:
+            </Text>
+            {presetExamples.map((example, index) => (
+              <Button
+                key={index}
+                variant="light"
+                size="xs"
+                mb="xs"
+                fullWidth
+                onClick={() => loadExample(example)}
+              >
+                {example.name}
+              </Button>
+            ))}
+          </Paper>
+
+          {convergenceInfo && (
+            <Card mt="md" shadow="sm">
+              <Group justify="space-between" mb="xs">
+                <Text fw={500}>Status Konvergensi</Text>
+                <Badge
+                  color={convergenceInfo.converged ? "green" : "orange"}
+                  variant="light"
+                >
+                  {convergenceInfo.converged ? "Konvergen" : "Belum Konvergen"}
+                </Badge>
+              </Group>
+              <Text size="sm">
+                Akar: <strong>{convergenceInfo.finalValue.toFixed(6)}</strong>
+              </Text>
+              <Text size="sm">
+                Iterasi: <strong>{convergenceInfo.iterations}</strong>
+              </Text>
+              <Text size="sm">
+                Error Akhir:{" "}
+                <strong>{convergenceInfo.finalError.toExponential(3)}</strong>
+              </Text>
+            </Card>
+          )}
+        </Grid.Col>
+
+        <Grid.Col span={{ base: 12, md: 8 }}>
+          {error && (
+            <Alert
+              icon={<Warning size={16} />}
+              title="Error"
+              color="red"
+              mb="md"
             >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis
-                dataKey="x"
-                type="number"
-                domain={["auto", "auto"]}
-                label={{ value: "x", position: "insideBottom", offset: -10 }}
+              {error}
+            </Alert>
+          )}
+
+          <FormulaExplanation equation={form.values.equation} />
+
+          {results.length > 0 && (
+            <>
+              <NewtonRaphsonChart
+                data={results}
+                equation={form.values.equation}
               />
-              <YAxis
-                domain={["auto", "auto"]}
-                label={{
-                  value: "f(x)",
-                  angle: -90,
-                  position: "insideLeft",
-                  offset: 0,
-                }}
-              />
-              <Tooltip
-                formatter={(value, name) => [
-                  typeof value === "number" ? value.toFixed(4) : value,
-                  name,
-                ]}
-              />
-              <Legend verticalAlign="top" />
-
-              {/* Garis f(x) */}
-              <Line
-                type="monotone"
-                dataKey="fx"
-                name="f(x)"
-                stroke="#ff4d4f"
-                dot={false}
-                strokeWidth={2}
-              />
-
-              {/* Segmen-segmen tangen */}
-              {iterations.map(({ i }, idx) => (
-                <Line
-                  key={i}
-                  type="linear"
-                  dataKey={`tan${i}`}
-                  name={`Tangen ke-${i}`}
-                  stroke="#228be6"
-                  dot={false}
-                  strokeWidth={1.5}
-                />
-              ))}
-
-              {/* Garis referensi vertikal di tiap xi */}
-              {iterations.map(({ i, xi }) => (
-                <ReferenceLine
-                  key={`xref-${i}`}
-                  x={xi}
-                  stroke="#999"
-                  strokeDasharray="3 3"
-                  label={{ position: "bottom", value: `x${i}` }}
-                />
-              ))}
-
-              {/* Garis referensi horizontal di tiap f(xi) */}
-              {iterations.map(({ i, fxi }) => (
-                <ReferenceLine
-                  key={`yref-${i}`}
-                  y={fxi}
-                  stroke="#999"
-                  strokeDasharray="3 3"
-                  label={{ position: "right", value: `f(x${i})` }}
-                />
-              ))}
-
-              {/* Titik iterasi */}
-              {iterations.map(({ i, xi, fxi }) => (
-                <ReferenceDot
-                  key={`dot-${i}`}
-                  x={xi}
-                  y={fxi}
-                  r={4}
-                  fill="#228be6"
-                  label={{
-                    position: "top",
-                    value: `(${xi.toFixed(2)}, ${fxi.toFixed(2)})`,
-                  }}
-                />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-
-          <Table
-            mt="6"
-            highlightOnHover
-            className="w-full table-auto border-collapse"
-          >
-            <thead>
-              <tr>
-                <th className="border px-4 py-2 text-center">Iterasi</th>
-                <th className="border px-4 py-2 text-center">
-                  x<sub>i</sub>
-                </th>
-                <th className="border px-4 py-2 text-center">
-                  f(x<sub>i</sub>)
-                </th>
-                <th className="border px-4 py-2 text-center">
-                  f&apos;(x<sub>i</sub>)
-                </th>
-                <th className="border px-4 py-2 text-center">
-                  x<sub>i+1</sub>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {iterations.map(({ i, xi, fxi, dfxi, xNext }) => (
-                <tr key={i}>
-                  <td className="border px-4 py-2 text-center">{i + 1}</td>
-                  <td className="border px-4 py-2 text-center">
-                    {xi.toFixed(6)}
-                  </td>
-                  <td className="border px-4 py-2 text-center">
-                    {fxi.toExponential(3)}
-                  </td>
-                  <td className="border px-4 py-2 text-center">
-                    {dfxi.toExponential(3)}
-                  </td>
-                  <td className="border px-4 py-2 text-center">
-                    {xNext.toFixed(6)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-        </Box>
-      )}
-    </Box>
+              <IterationTable data={results} />
+            </>
+          )}
+        </Grid.Col>
+      </Grid>
+    </Container>
   );
-}
+};
+
+export default NewtonRaphsonPage;
