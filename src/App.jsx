@@ -8,6 +8,7 @@ import HomePage from "./pages/Home";
 import LoginPage from "./pages/login";
 import IterationPage from "./pages/iteration"
 import Layout from "./components/Layout";
+import StoryPage from "./pages/story";
 
 const router = createBrowserRouter(
   createRoutesFromElements(
@@ -15,6 +16,7 @@ const router = createBrowserRouter(
       <Route index element={<HomePage />} />
       <Route path="/iteration" element={<IterationPage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/story" element={<StoryPage />} />
     </Route>
   )
 );
