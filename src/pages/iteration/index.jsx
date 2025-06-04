@@ -207,6 +207,16 @@ const FixedPointIterationPage = () => {
 
   return (
     <Container size="xl" py="xl">
+      <Title order={1} ta="center" mb="xl" c="blue">
+        😭 Pembelajaran Metode Iterasi Titik Tetap
+      </Title>
+
+      <Paper shadow="sm" p="md" radius="md" mb="xl" ta={"center"}>
+          Pelajari bagaimana metode iterasi titik tetap bekerja secara visual dan
+          interaktif
+      </Paper>
+      
+      
       <Grid>
         {/* --- INPUT & CONTROLS COLUMN --- */}
         <Grid.Col span={{ base: 12, md: 4 }}>
