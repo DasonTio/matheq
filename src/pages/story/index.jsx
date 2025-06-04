@@ -5,7 +5,7 @@ import {BiseksiNRegula, MetodeIterasi, MetodeNewtonRaphson, MetodeSecant} from "
 import { Link } from 'react-router-dom';
 
 const NavCard = ({image, label, url})=>{
-  return <Link to={url} className="border rounded-md flex flex-col justify-center items-center p-2 h-full hover:shadow-lg ease-in-out duration-200 cursor-pointer hover:bg-gray-100">
+  return <Link to={url} target='_blank' className="border rounded-md flex flex-col justify-center items-center p-2 h-full hover:shadow-lg ease-in-out duration-200 cursor-pointer hover:bg-gray-100">
     <img src={image} alt="" className='object-cover h-[20vh]' />
     <p>{label}</p>
   </Link>

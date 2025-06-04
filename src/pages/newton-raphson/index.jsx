@@ -19,7 +19,7 @@ import { Warning, Function, Target } from "@phosphor-icons/react";
 import { evaluate, derivative, parse } from "mathjs";
 import Latex from "react-latex";
 import FormulaExplanation from "../../components/FormulaExplanation";
-import FixedIterationTable from "../../components/FixedIterationTable";
+import NewtonRaphsonIterationTable from "../../components/NewtonRaphsonIterationTable";
 import NewtonRaphsonChart from "../../components/NewtonRaphsonChart";
 
 const NewtonRaphsonPage = () => {
@@ -268,7 +268,7 @@ const NewtonRaphsonPage = () => {
                 data={results}
                 equation={form.values.equation}
               />
-              <FixedIterationTable data={results} />
+              <NewtonRaphsonIterationTable data={results} />
             </>
           )}
         </Grid.Col>
