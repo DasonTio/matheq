@@ -14,8 +14,7 @@ import StoryPage from "./pages/story";
 const router = createBrowserRouter(
   createRoutesFromElements(
     <Route path="/">
-      <Route index element={<HomePage />} />
-      <Route path="/story" element={<StoryPage />} />
+      <Route index element={<StoryPage />} />
       <Route path="/metode_iterasi" element={<IterationPage />} />
       <Route path="/metode_tertutup" element={<MetodeTertutup />} />
       <Route path="/metode_secant" element={<MetodeSecant />} />

@@ -15,7 +15,7 @@ export default function FixedIterationChart({
   data, // Expects data points with x, g_x (for g(x)), y_equals_x (for y=x), and iterationMark
   xAxisLabel = "x",
   yAxisLabel = "y",
-  title = "Fixed-Point Iteration: \\(g(x)\\) and \\(y=x\\)",
+  title = "Fixed-Point Iteration: g(x) and y=x",
 }) {
   if (!data || data.length === 0) {
     return (
@@ -53,6 +53,7 @@ export default function FixedIterationChart({
     <Paper shadow="xs" p="md" mt="lg" withBorder>
       <Title order={4} ta="center" mb="md">
         <Latex>{title}</Latex>
+        {/* {title} */}
       </Title>
       <Box h={400}>
         <LineChart
@@ -92,7 +93,8 @@ export default function FixedIterationChart({
               return (
                 <Paper px="md" py="sm" withBorder shadow="md" radius="md">
                   <Text fw={500} mb={5}>
-                    <Latex>{`$x \\approx ${xVal}$`}</Latex>
+                    {/* <Latex>{`$x \\approx ${xVal}$`}</Latex> */}
+                    {`$x ≈ ${xVal}`}
                   </Text>
                   {payload.map((item) => {
                     if (item.value === undefined || item.value === null) return null;
