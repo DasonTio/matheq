@@ -27,6 +27,7 @@ const MetodeTertutupPage = () => {
   const [error, setError] = useState("");
   const [isCalculating, setIsCalculating] = useState(false);
   const [convergenceInfo, setConvergenceInfo] = useState(null);
+  const [currentIteration, setCurrentIteration] = useState(0); // Add this for step navigation
 
   const form = useForm({
     initialValues: {
@@ -141,6 +142,7 @@ const MetodeTertutupPage = () => {
       }
 
       setResults(steps);
+      setCurrentIteration(0); // Reset to first iteration when new calculation
     } catch (err) {
       setError("Terjadi kesalahan dalam perhitungan: " + err.message);
     }
@@ -157,6 +159,7 @@ const MetodeTertutupPage = () => {
     setResults([]);
     setConvergenceInfo(null);
     setError("");
+    setCurrentIteration(0);
   };
 
   const presetExamples = [
@@ -344,7 +347,14 @@ const MetodeTertutupPage = () => {
             </Alert>
           )}
 
-          <FormulaExplanation method={method} equation={form.values.equation} />
+          <FormulaExplanation 
+            method={method} 
+            equation={form.values.equation}
+            results={results}
+            currentIteration={currentIteration}
+            setCurrentIteration={setCurrentIteration}
+            tolerance={form.values.tolerance}
+          />
 
           {results.length > 0 && (
             <>
@@ -353,6 +363,8 @@ const MetodeTertutupPage = () => {
                 equation={form.values.equation}
                 method={method}
                 bounds={[form.values.lowerBound, form.values.upperBound]}
+                currentIteration={currentIteration}        // Add this
+                setCurrentIteration={setCurrentIteration}  // Add this
               />
               <IterationTable data={results} method={method} />
             </>

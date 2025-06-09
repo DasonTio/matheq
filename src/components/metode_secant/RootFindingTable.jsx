@@ -14,16 +14,17 @@ import {
 import { Paper, Title, Text, Group, Badge, Button, NumberInput } from "@mantine/core";
 import { evaluate } from "mathjs";
 
-const RootFindingChart = ({ 
+const RootFindingTable = ({ 
   data, 
   equation, 
-  method, 
-  bounds, 
-  currentIteration,     // Add this prop
-  setCurrentIteration   // Add this prop
+  x0, 
+  x1, 
+  currentIteration,
+  setCurrentIteration 
 }) => {
-  const [numPoints, setNumPoints] = useState(100);
-  
+  const [numPoints, setNumPoints] = useState(10);
+  const [zoomDomain, setZoomDomain] = useState(null);
+
   // Safe evaluation function
   const safeEval = (expr, x) => {
     try {
@@ -32,12 +33,15 @@ const RootFindingChart = ({
       return NaN;
     }
   };
-  
+
   // Generate chart data
-  const generateChartData = (points = 10) => {
-    const margin = Math.abs(bounds[1] - bounds[0]) * 0.3;
-    const start = Math.min(...bounds) - margin;
-    const end = Math.max(...bounds) + margin;
+  const generateChartData = (points = 200) => {
+    if (!x0 || !x1) return [];
+    
+    const chartCenter = (x0 + x1) / 2;
+    const chartRange = Math.max(2, Math.abs(x1 - x0) * 3);
+    const start = chartCenter - chartRange;
+    const end = chartCenter + chartRange;
     const step = (end - start) / (points - 1);
 
     return Array.from({ length: points }, (_, i) => {
@@ -50,22 +54,46 @@ const RootFindingChart = ({
   };
 
   const chartData = generateChartData(numPoints);
-  const total = chartData.length;
-  const start = Math.floor(total * 0.1);
-  const end = Math.ceil(total * 0.9);
+  const [brushRange, setBrushRange] = useState([0, chartData.length - 1]);
 
-  const [zoomDomain, setZoomDomain] = useState(null);
-  // Remove this line: const [currentIteration, setCurrentIteration] = useState(data.length - 1);
-  const [brushRange, setBrushRange] = useState([0, numPoints - 1]);
+  React.useEffect(() => {
+    setZoomDomain(null);
+    setBrushRange([0, chartData.length - 1]);
+  }, [equation, x0, x1, numPoints]);
 
   const currentStep = data[currentIteration] || {};
 
+  // Generate secant line data for visualization
+  const generateSecantLineData = () => {
+    if (!currentStep.xPrev || !currentStep.xCurr) return [];
+    
+    const slope = currentStep.slope;
+    const x1 = currentStep.xCurr;
+    const y1 = currentStep.fCurr;
+    
+    const intercept = y1 - slope * x1;
+    
+    const minX = Math.min(currentStep.xPrev, currentStep.xCurr) - 0.5;
+    const maxX = Math.max(currentStep.xPrev, currentStep.xCurr) + 0.5;
+    const step = (maxX - minX) / 50;
+    
+    return Array.from({ length: 51 }, (_, i) => {
+      const x = minX + i * step;
+      return {
+        x: Number(x.toFixed(6)),
+        y: slope * x + intercept,
+      };
+    });
+  };
+
+  const secantLineData = generateSecantLineData();
+
   // Convergence data for second chart
-  const convergenceData = data.map((item, index) => ({
+  const convergenceData = data.map((item) => ({
     iteration: item.iteration,
-    intervalWidth: Math.abs(item.b - item.a),
-    error: Math.abs(item.fc),
-    c: item.c,
+    error: Math.abs(item.error),
+    fValue: Math.abs(item.fNext),
+    xValue: item.xNext,
   }));
 
   const CustomTooltip = ({ active, payload, label }) => {
@@ -75,7 +103,7 @@ const RootFindingChart = ({
           <p className="font-semibold">{`x = ${label}`}</p>
           {payload.map((entry, index) => (
             <p key={index} style={{ color: entry.color }}>
-              {`f(x) = ${entry.value?.toFixed(6) || 'NaN'}`}
+              {`${entry.name}: ${entry.value?.toFixed(6) || 'NaN'}`}
             </p>
           ))}
         </div>
@@ -91,11 +119,7 @@ const RootFindingChart = ({
           <p className="font-semibold">{`Iterasi: ${label}`}</p>
           {payload.map((entry, index) => (
             <p key={index} style={{ color: entry.color }}>
-              {`${entry.name}: ${
-                entry.name.includes("Error") || entry.name.includes("Lebar")
-                  ? entry.value.toExponential(3)
-                  : entry.value.toFixed(6)
-              }`}
+              {`${entry.name}: ${entry.value.toExponential(3)}`}
             </p>
           ))}
         </div>
@@ -103,12 +127,6 @@ const RootFindingChart = ({
     }
     return null;
   };
-
-  React.useEffect(() => {
-    setZoomDomain(null);
-    setBrushRange([0, chartData.length - 1]);
-    // Remove this line: setCurrentIteration(data.length - 1);
-  }, [equation, bounds[0], bounds[1], numPoints]);
 
   const handleBrushChange = (e) => {
     if (e && e.startIndex !== undefined && e.endIndex !== undefined) {
@@ -122,43 +140,49 @@ const RootFindingChart = ({
     }
   };
 
-  const methodNames = {
-    bisection: "Biseksi",
-    "regula-falsi": "Regula Falsi"
-  };
+  if (chartData.length === 0) {
+    return (
+      <Paper shadow="sm" p="md" radius="md" mb="md">
+        <Title order={4}>📈 Visualisasi Metode Secant</Title>
+        <Text c="dimmed" ta="center" mt="md">
+          Masukkan parameter dan jalankan perhitungan untuk melihat grafik
+        </Text>
+      </Paper>
+    );
+  }
 
   return (
     <Paper shadow="sm" p="md" radius="md" mb="md">
       <Group justify="space-between" mb="md">
-        <Title order={4}>📈 Visualisasi Metode {methodNames[method]}</Title>
+        <Title order={4}>📈 Visualisasi Metode Secant</Title>
         <Badge variant="light" color="blue">
           Iterasi {currentIteration + 1} dari {data.length}
         </Badge>
       </Group>
 
       <Text size="sm" c="dimmed" mb="md">
-        Grafik menunjukkan fungsi dan proses konvergensi interval menuju akar
+        Grafik menunjukkan fungsi, garis secant, dan proses konvergensi
       </Text>
 
-      {/* Add NumberInput control here instead of inside LineChart */}
+      {/* Number of points control */}
       <Group justify="space-between" mb="md">
         <NumberInput
           label="Jumlah Titik Grafik"
           value={numPoints}
           onChange={setNumPoints}
-          min={5}
+          min={50}
           max={500}
-          step={1}
+          step={10}
           w={200}
           size="sm"
-          description="Kontrol resolusi grafik. Semakin kecil semakin cepat"
+          description="Kontrol resolusi grafik. Semakin kecil semakin cepat."
         />
       </Group>
 
       {/* Function Graph */}
       <div className="mb-6">
         <Group justify="space-between" mb="sm">
-          <Text fw={500}>Grafik Fungsi dan Interval</Text>
+          <Text fw={500}>Grafik Fungsi dan Garis Secant</Text>
           <Group>
             <Button
               size="xs"
@@ -217,26 +241,46 @@ const RootFindingChart = ({
                 name="f(x)"
               />
               
+              {/* Secant line */}
+              {secantLineData.length > 0 && (
+                <Line
+                  data={secantLineData}
+                  type="monotone"
+                  dataKey="y"
+                  stroke="#ff7300"
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                  dot={false}
+                  name="Garis Secant"
+                />
+              )}
+              
               {/* Reference lines */}
               <ReferenceLine y={0} stroke="#000" strokeDasharray="2 2" />
-              <ReferenceLine
-                x={currentStep.a}
-                stroke="#22c55e"
-                strokeWidth={3}
-                label={{ value: `a = ${currentStep.a?.toFixed(4)}`, position: "topLeft" }}
-              />
-              <ReferenceLine
-                x={currentStep.b}
-                stroke="#f59e0b"
-                strokeWidth={3}
-                label={{ value: `b = ${currentStep.b?.toFixed(4)}`, position: "topRight" }}
-              />
-              <ReferenceLine
-                x={currentStep.c}
-                stroke="#ef4444"
-                strokeWidth={3}
-                label={{ value: `c = ${currentStep.c?.toFixed(4)}`, position: "top" }}
-              />
+              {currentStep.xPrev && (
+                <ReferenceLine
+                  x={currentStep.xPrev}
+                  stroke="#22c55e"
+                  strokeWidth={3}
+                  label={{ value: `x₍ₙ₋₁₎ = ${currentStep.xPrev?.toFixed(4)}`, position: "topLeft" }}
+                />
+              )}
+              {currentStep.xCurr && (
+                <ReferenceLine
+                  x={currentStep.xCurr}
+                  stroke="#f59e0b"
+                  strokeWidth={3}
+                  label={{ value: `xₙ = ${currentStep.xCurr?.toFixed(4)}`, position: "top" }}
+                />
+              )}
+              {currentStep.xNext && (
+                <ReferenceLine
+                  x={currentStep.xNext}
+                  stroke="#ef4444"
+                  strokeWidth={3}
+                  label={{ value: `x₍ₙ₊₁₎ = ${currentStep.xNext?.toFixed(4)}`, position: "topRight" }}
+                />
+              )}
               
               <Brush
                 dataKey="x"
@@ -251,41 +295,10 @@ const RootFindingChart = ({
         </div>
       </div>
 
-      {/* Rest of your component stays the same... */}
       {/* Convergence Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div>
-          <Text fw={500} mb="xs">Konvergensi Lebar Interval</Text>
-          <div style={{ width: "100%", height: 250 }}>
-            <ResponsiveContainer>
-              <LineChart data={convergenceData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                  dataKey="iteration"
-                  label={{ value: "Iterasi", position: "insideBottom", offset: -10 }}
-                />
-                <YAxis
-                  scale="log"
-                  domain={["dataMin", "dataMax"]}
-                  label={{ value: "Lebar Interval (log)", angle: -90, position: "insideLeft" }}
-                />
-                <Tooltip content={<ConvergenceTooltip />} />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="intervalWidth"
-                  stroke="#22c55e"
-                  strokeWidth={2}
-                  dot={{ fill: "#22c55e", strokeWidth: 2, r: 4 }}
-                  name="Lebar Interval"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div>
-          <Text fw={500} mb="xs">Penurunan Error |f(c)|</Text>
+          <Text fw={500} mb="xs">Konvergensi Error Absolut</Text>
           <div style={{ width: "100%", height: 250 }}>
             <ResponsiveContainer>
               <LineChart data={convergenceData}>
@@ -304,10 +317,40 @@ const RootFindingChart = ({
                 <Line
                   type="monotone"
                   dataKey="error"
+                  stroke="#22c55e"
+                  strokeWidth={2}
+                  dot={{ fill: "#22c55e", strokeWidth: 2, r: 4 }}
+                  name="Error |xₙ₊₁ - xₙ|"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div>
+          <Text fw={500} mb="xs">Penurunan |f(x)|</Text>
+          <div style={{ width: "100%", height: 250 }}>
+            <ResponsiveContainer>
+              <LineChart data={convergenceData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="iteration"
+                  label={{ value: "Iterasi", position: "insideBottom", offset: -10 }}
+                />
+                <YAxis
+                  scale="log"
+                  domain={["dataMin", "dataMax"]}
+                  label={{ value: "|f(x)| (log)", angle: -90, position: "insideLeft" }}
+                />
+                <Tooltip content={<ConvergenceTooltip />} />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey="fValue"
                   stroke="#ef4444"
                   strokeWidth={2}
                   dot={{ fill: "#ef4444", strokeWidth: 2, r: 4 }}
-                  name="Error |f(c)|"
+                  name="Nilai |f(x)|"
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -315,56 +358,34 @@ const RootFindingChart = ({
         </div>
       </div>
 
-      {/* Explanation */}
-      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-        <Text size="sm" fw={500} mb="xs">
-          💡 Interpretasi Grafik:
-        </Text>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
-          <ul className="space-y-1">
-            <li>• <strong>Grafik atas:</strong> Fungsi f(x) dan interval [a,b]</li>
-            <li>• <strong>Garis hijau/kuning:</strong> Batas interval a dan b</li>
-            <li>• <strong>Garis merah:</strong> Perkiraan akar c</li>
-          </ul>
-          <ul className="space-y-1">
-            <li>• <strong>Grafik kiri bawah:</strong> Lebar interval mengecil</li>
-            <li>• <strong>Grafik kanan bawah:</strong> Error |f(c)| mendekati 0</li>
-            <li>• <strong>Skala logaritmik:</strong> Untuk melihat penurunan</li>
-          </ul>
-          <ul className="space-y-1">
-            <li>• <strong>Brush (brush bawah):</strong> Zoom ke area tertentu</li>
-            <li>• <strong>Prev/Next:</strong> Lihat iterasi per langkah</li>
-            <li>• <strong>Hover:</strong> Detail nilai di titik</li>
-          </ul>
-        </div>
-      </div>
-
       {/* Current iteration info */}
-      <div className="mt-4 p-3 bg-green-50 rounded-lg">
-        <Text size="sm" fw={500} mb="xs">
-          📊 Status Iterasi {currentIteration + 1}:
-        </Text>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-          <div>
-            <Text size="xs" c="dimmed">Interval:</Text>
-            <Text fw={500}>[{currentStep.a?.toFixed(6)}, {currentStep.b?.toFixed(6)}]</Text>
-          </div>
-          <div>
-            <Text size="xs" c="dimmed">Titik c:</Text>
-            <Text fw={500}>{currentStep.c?.toFixed(8)}</Text>
-          </div>
-          <div>
-            <Text size="xs" c="dimmed">f(c):</Text>
-            <Text fw={500}>{currentStep.fc?.toExponential(3)}</Text>
-          </div>
-          <div>
-            <Text size="xs" c="dimmed">Lebar Interval:</Text>
-            <Text fw={500}>{(Math.abs(currentStep.b - currentStep.a)).toExponential(3)}</Text>
+      {currentStep.xNext && (
+        <div className="mt-4 p-3 bg-green-50 rounded-lg">
+          <Text size="sm" fw={500} mb="xs">
+            📊 Status Iterasi {currentIteration + 1}:
+          </Text>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+            <div>
+              <Text size="xs" c="dimmed">x₍ₙ₋₁₎:</Text>
+              <Text fw={500}>{currentStep.xPrev?.toFixed(6)}</Text>
+            </div>
+            <div>
+              <Text size="xs" c="dimmed">xₙ:</Text>
+              <Text fw={500}>{currentStep.xCurr?.toFixed(6)}</Text>
+            </div>
+            <div>
+              <Text size="xs" c="dimmed">x₍ₙ₊₁₎:</Text>
+              <Text fw={500}>{currentStep.xNext?.toFixed(8)}</Text>
+            </div>
+            <div>
+              <Text size="xs" c="dimmed">Gradien Secant:</Text>
+              <Text fw={500}>{currentStep.slope?.toExponential(3)}</Text>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </Paper>
   );
 };
 
-export default RootFindingChart;
+export default RootFindingTable;
