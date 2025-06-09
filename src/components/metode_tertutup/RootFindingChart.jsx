@@ -14,8 +14,15 @@ import {
 import { Paper, Title, Text, Group, Badge, Button, NumberInput } from "@mantine/core";
 import { evaluate } from "mathjs";
 
-const RootFindingChart = ({ data, equation, method, bounds }) => {
-  const [numPoints, setNumPoints] = useState(10); // or any default you like
+const RootFindingChart = ({ 
+  data, 
+  equation, 
+  method, 
+  bounds, 
+  currentIteration,     // Add this prop
+  setCurrentIteration   // Add this prop
+}) => {
+  const [numPoints, setNumPoints] = useState(100);
   
   // Safe evaluation function
   const safeEval = (expr, x) => {
@@ -48,7 +55,7 @@ const RootFindingChart = ({ data, equation, method, bounds }) => {
   const end = Math.ceil(total * 0.9);
 
   const [zoomDomain, setZoomDomain] = useState(null);
-  const [currentIteration, setCurrentIteration] = useState(data.length - 1);
+  // Remove this line: const [currentIteration, setCurrentIteration] = useState(data.length - 1);
   const [brushRange, setBrushRange] = useState([0, numPoints - 1]);
 
   const currentStep = data[currentIteration] || {};
@@ -98,24 +105,22 @@ const RootFindingChart = ({ data, equation, method, bounds }) => {
   };
 
   React.useEffect(() => {
-  setZoomDomain(null);
-  setBrushRange([0, chartData.length - 1]);
-  setCurrentIteration(data.length - 1);
-}, [equation, bounds[0], bounds[1], numPoints]);
-
-  const handleBrushChange = (e) => {
-  if (e && e.startIndex !== undefined && e.endIndex !== undefined) {
-    const startX = chartData[e.startIndex]?.x;
-    const endX = chartData[e.endIndex]?.x;
-    setZoomDomain([startX, endX]);
-    setBrushRange([e.startIndex, e.endIndex]);
-  } else {
     setZoomDomain(null);
     setBrushRange([0, chartData.length - 1]);
-  }
-};
+    // Remove this line: setCurrentIteration(data.length - 1);
+  }, [equation, bounds[0], bounds[1], numPoints]);
 
-  
+  const handleBrushChange = (e) => {
+    if (e && e.startIndex !== undefined && e.endIndex !== undefined) {
+      const startX = chartData[e.startIndex]?.x;
+      const endX = chartData[e.endIndex]?.x;
+      setZoomDomain([startX, endX]);
+      setBrushRange([e.startIndex, e.endIndex]);
+    } else {
+      setZoomDomain(null);
+      setBrushRange([0, chartData.length - 1]);
+    }
+  };
 
   const methodNames = {
     bisection: "Biseksi",
@@ -134,6 +139,21 @@ const RootFindingChart = ({ data, equation, method, bounds }) => {
       <Text size="sm" c="dimmed" mb="md">
         Grafik menunjukkan fungsi dan proses konvergensi interval menuju akar
       </Text>
+
+      {/* Add NumberInput control here instead of inside LineChart */}
+      <Group justify="space-between" mb="md">
+        <NumberInput
+          label="Jumlah Titik Grafik"
+          value={numPoints}
+          onChange={setNumPoints}
+          min={5}
+          max={500}
+          step={1}
+          w={200}
+          size="sm"
+          description="Kontrol resolusi grafik. Semakin kecil semakin cepat"
+        />
+      </Group>
 
       {/* Function Graph */}
       <div className="mb-6">
@@ -226,21 +246,12 @@ const RootFindingChart = ({ data, equation, method, bounds }) => {
                 startIndex={brushRange[0]}
                 endIndex={brushRange[1]}
               />
-              <NumberInput
-                label="Jumlah Titik Grafik"
-                value={numPoints}
-                onChange={setNumPoints}
-                min={5}
-                max={500}
-                step={1}
-                mb="md"
-                description="Semakin banyak titik, semakin halus grafik (tapi lebih berat)"
-              />
             </LineChart>
           </ResponsiveContainer>
         </div>
       </div>
 
+      {/* Rest of your component stays the same... */}
       {/* Convergence Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div>
