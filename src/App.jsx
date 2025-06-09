@@ -7,7 +7,6 @@ import {
 import MetodeTertutup from "./pages/metode_tertutup";
 import MetodeSecant from "./pages/metode_secant";
 import NewtonRaphsonPage from "./pages/newton-raphson";
-import HomePage from "./pages/Home";
 import IterationPage from "./pages/iteration"
 import StoryPage from "./pages/story";
 
